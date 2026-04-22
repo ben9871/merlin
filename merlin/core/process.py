@@ -129,6 +129,10 @@ class ComputationProcess(AbstractComputationProcess):
                 raise ValueError("The number of photons should be provided")
         else:
             self.n_photons = n_photons
+        combinator = Combinadics(
+            self.computation_space.value, self.n_photons, self.m
+        )
+        self.logical_keys = [tuple(state) for state in combinator.iter_states()]
         # Build computation graphs
         self._setup_computation_graphs()
 
@@ -155,6 +159,7 @@ class ComputationProcess(AbstractComputationProcess):
             keep_keys=True,  # Usually want to keep keys for output interpretation
             device=self.device,
             dtype=self.dtype,
+            output_map_func=self.output_map_func,
         )
 
     def compute(self, parameters: list[torch.Tensor]) -> torch.Tensor:
@@ -225,47 +230,56 @@ class ComputationProcess(AbstractComputationProcess):
 
             return chain
 
-        mask = (prepared_state.real**2 + prepared_state.imag**2 < 1e-13).all(dim=0)
-
-        masked_input_state = (~mask).int().tolist()
-
         input_states = [
-            (k, self.simulation_graph.mapped_keys[k])
-            for k, mask in enumerate(masked_input_state)
-            if mask == 1
+            (k, self.logical_keys[k])
+            for k in self._active_superposition_indices(prepared_state)
         ]
+        if not input_states:
+            empty = torch.zeros(
+                (prepared_state.shape[0], len(self.simulation_graph.mapped_keys)),
+                dtype=unitary.dtype,
+                device=prepared_state.device,
+            )
+            keys_out = list(self.simulation_graph.mapped_keys)
+            if return_keys:
+                return keys_out, empty
+            return empty
 
         state_list = reorder_swap_chain(input_states)
 
         prev_state_index, prev_state = state_list.pop(0)
 
         keys, amplitude = self.simulation_graph.compute(unitary, prev_state)
-        amplitudes = torch.zeros(
-            (prepared_state.shape[-1], len(self.simulation_graph.mapped_keys)),
+        if amplitude.ndim == 2 and amplitude.shape[0] == 1:
+            amplitude = amplitude.squeeze(0)
+        keys_out = list(self.simulation_graph.mapped_keys)
+        final_amplitudes = torch.zeros(
+            (prepared_state.shape[0], len(self.simulation_graph.mapped_keys)),
             dtype=amplitude.dtype,
             device=prepared_state.device,
         )
-        amplitudes[prev_state_index] = amplitude
+        amplitude = amplitude / amplitude.norm(p=2).clamp_min(1e-12)
+        coeffs = self._gather_superposition_coefficients(
+            prepared_state, [prev_state_index]
+        ).to(amplitude.dtype)
+        final_amplitudes += coeffs[:, :1] * amplitude.unsqueeze(0)
 
         for index, fock_state in state_list:
-            amplitudes[index] = self.simulation_graph.compute_pa_inc(
+            component = self.simulation_graph.compute_pa_inc(
                 unitary,
                 prev_state,
                 fock_state,
                 changed_unitary=changed_unitary,
             )
+            if component.ndim == 2 and component.shape[0] == 1:
+                component = component.squeeze(0)
+            component = component / component.norm(p=2).clamp_min(1e-12)
+            coeffs = self._gather_superposition_coefficients(
+                prepared_state, [index]
+            ).to(component.dtype)
+            final_amplitudes += coeffs[:, :1] * component.unsqueeze(0)
             changed_unitary = False
             prev_state = fock_state
-
-        input_state = prepared_state.to(amplitudes.dtype)
-        amplitudes = amplitudes / amplitudes.norm(p=2, dim=-1, keepdim=True).clamp_min(
-            1e-12
-        )
-
-        # The actual sum of amplitudes weighted by input coefficients (for each batch element) is done here
-        final_amplitudes = input_state @ amplitudes
-
-        keys_out = list(self.simulation_graph.mapped_keys)
 
         if return_keys:
             return keys_out, final_amplitudes
@@ -332,20 +346,17 @@ class ComputationProcess(AbstractComputationProcess):
             unitary = unitary.unsqueeze(0)
         parameter_batch = unitary.shape[0]
 
-        # Find non-zero input states - for efficient processing of only not zero amplitude states
-        mask = (prepared_state.real**2 + prepared_state.imag**2 < 1e-13).all(dim=0)
-        masked_input_state = (~mask).int().tolist()
         input_states = [
-            (k, self.simulation_graph.mapped_keys[k])
-            for k, mask in enumerate(masked_input_state)
-            if mask == 1
+            (k, self.logical_keys[k])
+            for k in self._active_superposition_indices(prepared_state)
         ]
 
-        # Initialize amplitudes tensor
-        amplitudes = torch.zeros(
+        # Stream each chunk directly into the final output tensor instead of
+        # materializing a dense [input_basis, output_basis] intermediate.
+        final_amplitudes = torch.zeros(
             (
                 parameter_batch,
-                prepared_state.shape[-1],
+                prepared_state.shape[0],
                 len(self.simulation_graph.mapped_keys),
             ),
             dtype=unitary.dtype,
@@ -363,23 +374,19 @@ class ComputationProcess(AbstractComputationProcess):
                 batch_indices.append(idx)
                 batch_fock_states.append(fock_state)
 
+            coeffs = self._gather_superposition_coefficients(
+                prepared_state, batch_indices
+            ).to(unitary.dtype)
             # Compute batch amplitudes
             _, batch_amplitudes = self.simulation_graph.compute_batch(
                 unitary, batch_fock_states
             )
-            # Stack amplitudes for each input state in the batch
-            for k, idx in enumerate(batch_indices):
-                amplitudes[:, idx, :] = batch_amplitudes[:, :, k]
-
-        # Apply input state coefficients
-        input_state = prepared_state.to(amplitudes.dtype)
-
-        amplitudes = amplitudes / amplitudes.norm(p=2, dim=-1, keepdim=True).clamp_min(
-            1e-12
-        )
-        # The actual sum of amplitudes weighted by input coefficients (for each batch element) is done here
-        # Combine each prepared input coefficient with the output amplitudes of every propagated Fock component.
-        final_amplitudes = torch.einsum("se, beo -> bso", input_state, amplitudes)
+            batch_amplitudes = batch_amplitudes / batch_amplitudes.norm(
+                p=2, dim=1, keepdim=True
+            ).clamp_min(1e-12)
+            final_amplitudes += torch.einsum(
+                "se, boe -> bso", coeffs, batch_amplitudes
+            )
 
         if final_amplitudes.shape[0] == 1:
             final_amplitudes = final_amplitudes.squeeze(0)
@@ -503,16 +510,29 @@ class ComputationProcess(AbstractComputationProcess):
         else:
             return None
 
-        # Detect tensors encoded in the UNBUNCHED basis and lift them to the Fock basis.
-        unbunched_size = math.comb(self.m, self.n_photons)
-        if feature_dim != unbunched_size:
-            return None
+        logical_keys = [tuple(key) for key in self.logical_keys]
+        target_dim = len(logical_keys)
 
         mapped_keys = [
             tuple(key)
             for key in self.simulation_graph.mapped_keys  # type: ignore[attr-defined]
         ]
-        key_to_index = {state: idx for idx, state in enumerate(mapped_keys)}
+        if feature_dim == len(mapped_keys) and target_dim != feature_dim:
+            key_to_index = {state: idx for idx, state in enumerate(logical_keys)}
+            indices = []
+            for state in mapped_keys:
+                index = key_to_index.get(state)
+                if index is None:
+                    return None
+                indices.append(index)
+            return self._expand_superposition_tensor(tensor, indices, target_dim)
+
+        # Detect tensors encoded in the UNBUNCHED basis and lift them to the Fock basis.
+        unbunched_size = math.comb(self.m, self.n_photons)
+        if feature_dim != unbunched_size:
+            return None
+
+        key_to_index = {state: idx for idx, state in enumerate(logical_keys)}
 
         try:
             combinator = Combinadics("unbunched", self.n_photons, self.m)
@@ -526,15 +546,136 @@ class ComputationProcess(AbstractComputationProcess):
                 return None
             indices.append(index)
 
-        target_dim = len(mapped_keys)
+        return self._expand_superposition_tensor(tensor, indices, target_dim)
+
+    @staticmethod
+    def _expand_superposition_tensor(
+        tensor: torch.Tensor, indices: list[int], target_dim: int
+    ) -> torch.Tensor:
+        """Lift a reduced-basis superposition tensor into a larger logical basis."""
         if tensor.dim() == 1:
+            if tensor.is_sparse:
+                coalesced = tensor.coalesce()
+                index_map = torch.tensor(
+                    indices, dtype=torch.long, device=coalesced.device
+                )
+                mapped = index_map[coalesced.indices()[0]]
+                return torch.sparse_coo_tensor(
+                    mapped.unsqueeze(0),
+                    coalesced.values(),
+                    (target_dim,),
+                    dtype=coalesced.dtype,
+                    device=coalesced.device,
+                ).coalesce()
             expanded = tensor.new_zeros(target_dim)
             expanded[indices] = tensor
-        else:
-            expanded = tensor.new_zeros(tensor.shape[0], target_dim)
-            expanded[:, indices] = tensor
+            return expanded
 
+        if tensor.is_sparse:
+            coalesced = tensor.coalesce()
+            index_map = torch.tensor(
+                indices, dtype=torch.long, device=coalesced.device
+            )
+            mapped = index_map[coalesced.indices()[1]]
+            expanded_indices = torch.stack((coalesced.indices()[0], mapped))
+            return torch.sparse_coo_tensor(
+                expanded_indices,
+                coalesced.values(),
+                (tensor.shape[0], target_dim),
+                dtype=coalesced.dtype,
+                device=coalesced.device,
+            ).coalesce()
+        expanded = tensor.new_zeros(tensor.shape[0], target_dim)
+        expanded[:, indices] = tensor
         return expanded
+
+    @staticmethod
+    def _unsqueeze_superposition_tensor(tensor: torch.Tensor) -> torch.Tensor:
+        """Add a batch dimension while preserving sparse COO storage."""
+        if tensor.dim() != 1:
+            return tensor
+        if not tensor.is_sparse:
+            return tensor.unsqueeze(0)
+
+        coalesced = tensor.coalesce()
+        nnz = coalesced.values().shape[0]
+        batch_indices = torch.zeros(
+            (1, nnz), dtype=torch.long, device=coalesced.device
+        )
+        indices = torch.cat((batch_indices, coalesced.indices()), dim=0)
+        return torch.sparse_coo_tensor(
+            indices,
+            coalesced.values(),
+            (1, tensor.shape[0]),
+            dtype=coalesced.dtype,
+            device=coalesced.device,
+        ).coalesce()
+
+    @staticmethod
+    def _normalize_superposition_tensor(tensor: torch.Tensor) -> torch.Tensor:
+        """Normalize batched superposition tensors without forcing densification."""
+        if not tensor.is_sparse:
+            norm = tensor.abs().pow(2).sum(dim=1, keepdim=True).sqrt().clamp_min(1e-12)
+            return tensor / norm
+
+        coalesced = tensor.coalesce()
+        indices = coalesced.indices()
+        values = coalesced.values()
+        row_indices = indices[0]
+        magnitude_sq = values.real.pow(2) + values.imag.pow(2)
+        norm_sq = torch.zeros(
+            tensor.shape[0], dtype=magnitude_sq.dtype, device=magnitude_sq.device
+        )
+        norm_sq.scatter_add_(0, row_indices, magnitude_sq)
+        norms = norm_sq.sqrt().clamp_min(1e-12)
+        scaled_values = values / norms[row_indices]
+        return torch.sparse_coo_tensor(
+            indices,
+            scaled_values,
+            coalesced.shape,
+            dtype=coalesced.dtype,
+            device=coalesced.device,
+        ).coalesce()
+
+    @staticmethod
+    def _active_superposition_indices(tensor: torch.Tensor) -> list[int]:
+        """Return the active basis indices in a batched superposition tensor."""
+        if tensor.is_sparse:
+            cols = tensor.coalesce().indices()[-1].tolist()
+            return list(dict.fromkeys(int(col) for col in cols))
+
+        mask = (tensor.real.pow(2) + tensor.imag.pow(2) < 1e-13).all(dim=0)
+        return [idx for idx, active in enumerate((~mask).tolist()) if active]
+
+    @staticmethod
+    def _gather_superposition_coefficients(
+        tensor: torch.Tensor, basis_indices: list[int]
+    ) -> torch.Tensor:
+        """Extract selected basis coefficients as a small dense tensor."""
+        if not basis_indices:
+            return torch.zeros(
+                (tensor.shape[0], 0), dtype=tensor.dtype, device=tensor.device
+            )
+        if not tensor.is_sparse:
+            return tensor[:, basis_indices]
+
+        coalesced = tensor.coalesce()
+        lookup = {basis_idx: pos for pos, basis_idx in enumerate(basis_indices)}
+        gathered = torch.zeros(
+            (tensor.shape[0], len(basis_indices)),
+            dtype=coalesced.dtype,
+            device=coalesced.device,
+        )
+        indices = coalesced.indices()
+        values = coalesced.values()
+        for col in range(values.shape[0]):
+            basis_idx = int(indices[1, col].item())
+            pos = lookup.get(basis_idx)
+            if pos is None:
+                continue
+            row = int(indices[0, col].item())
+            gathered[row, pos] = values[col]
+        return gathered
 
     def _prepare_superposition_tensor(self) -> torch.Tensor:
         """Validate, normalise, and convert the stored superposition state to the correct dtype."""
@@ -549,8 +690,7 @@ class ComputationProcess(AbstractComputationProcess):
 
         self._validate_superposition_state_shape(tensor)
 
-        if tensor.dim() == 1:
-            tensor = tensor.unsqueeze(0)
+        tensor = self._unsqueeze_superposition_tensor(tensor)
 
         if tensor.dtype == torch.float32:
             tensor = tensor.to(torch.complex64)
@@ -561,8 +701,7 @@ class ComputationProcess(AbstractComputationProcess):
                 f"Unsupported dtype for superposition state: {tensor.dtype}"
             )
 
-        norm = tensor.abs().pow(2).sum(dim=1, keepdim=True).sqrt()
-        tensor = tensor / norm
+        tensor = self._normalize_superposition_tensor(tensor)
         self.input_state = tensor
         return tensor
 

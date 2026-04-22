@@ -403,6 +403,22 @@ class QuantumLayer(MerlinModule):
             )
             process_input_state = self.input_state
 
+        output_map_func = None
+        if isinstance(measurement_strategy, MeasurementStrategy):
+            if measurement_strategy.has_partition_selection():
+                if self.has_custom_noise_model or self._has_custom_detectors:
+                    raise ValueError(
+                        "Partition-based output filtering is only supported for unitary outputs without custom noise or detectors."
+                    )
+                if _resolve_measurement_kind(measurement_strategy) == MeasurementKind.PARTIAL:
+                    raise ValueError(
+                        "Partition-based output filtering cannot be combined with MeasurementStrategy.partial()."
+                    )
+                output_map_func = measurement_strategy.build_output_map_func(
+                    n_modes=circuit.m,
+                    n_photons=resolved_n_photons,
+                )
+
         self.computation_process = ComputationProcessFactory.create(
             circuit=circuit,
             input_state=process_input_state,
@@ -412,11 +428,12 @@ class QuantumLayer(MerlinModule):
             device=self.device,
             dtype=self.dtype,
             computation_space=self.computation_space,
+            output_map_func=output_map_func,
         )
 
         # If input_state was a StateVector, set the actual tensor now (after init to bypass validation)
         if statevector_input is not None:
-            sv_tensor = statevector_input.to_dense()
+            sv_tensor = statevector_input.normalize().tensor
             if sv_tensor.device != self.device:
                 sv_tensor = sv_tensor.to(self.device)
             if sv_tensor.dtype != self.complex_dtype:
@@ -654,13 +671,17 @@ class QuantumLayer(MerlinModule):
                 "Amplitude-encoded inputs must be 1D (single state) or 2D (batch of states) tensors"
             )
 
-        expected_dim = len(self.output_keys)
+        logical_keys = getattr(self.computation_process, "logical_keys", None)
+        allowed_dims = {len(self.output_keys)}
+        if logical_keys is not None:
+            allowed_dims.add(len(logical_keys))
         feature_dim = amplitude.shape[-1]
-        if feature_dim != expected_dim:
+        if feature_dim not in allowed_dims:
+            expected_dims = ", ".join(str(dim) for dim in sorted(allowed_dims))
             raise ValueError(
-                f"Amplitude input expects {expected_dim} components, received {feature_dim}."
+                f"Amplitude input expects one of [{expected_dims}] components, "
+                f"received {feature_dim}."
             )
-            # TODO: suggest/implement zero-padding or sparsity tensor format
 
         if amplitude.dtype not in (
             torch.float32,
@@ -817,10 +838,7 @@ class QuantumLayer(MerlinModule):
                     "Use either tensor inputs (angle encoding) or StateVector (amplitude encoding)."
                 )
             sv = input_parameters[0]
-            # Convert to dense for computation pipeline (sparse not supported downstream).
-            # StateVector's sparse representation is still valuable for memory-efficient
-            # construction and manipulation; we only densify at computation time.
-            amplitude_tensor = sv.to_dense()
+            amplitude_tensor = sv.normalize().tensor
             if amplitude_tensor.device != self.device:
                 amplitude_tensor = amplitude_tensor.to(self.device)
             if amplitude_tensor.dtype != self.complex_dtype:
@@ -892,6 +910,7 @@ class QuantumLayer(MerlinModule):
                 inferred_state=inferred_state,
                 parameter_batch_dim=parameter_batch_dim,
                 simultaneous_processes=simultaneous_processes,
+                vectorized_amplitude_input=amplitude_input is not None,
             )
 
         # Phase 4: Configure sampling/autodiff
@@ -979,9 +998,10 @@ class QuantumLayer(MerlinModule):
         inferred_state: torch.Tensor | None,
         parameter_batch_dim: int,
         simultaneous_processes: int | None,
+        vectorized_amplitude_input: bool,
     ) -> torch.Tensor:
         """Select the computation path based on the encoding mode and input state."""
-        if self.amplitude_encoding:
+        if self.amplitude_encoding or vectorized_amplitude_input:
             if inferred_state is None:
                 raise TypeError(
                     "Amplitude encoding requires the computation process input_state to be a tensor."

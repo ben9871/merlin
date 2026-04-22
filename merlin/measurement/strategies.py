@@ -246,12 +246,21 @@ class MeasurementStrategy(metaclass=_MeasurementStrategyMeta):
         Computation space used by the strategy.
     grouping : LexGrouping | ModGrouping | None
         Optional grouping applied to probability outputs.
+    partition_blocks : tuple[int, ...]
+        Optional partition of the output modes into contiguous blocks used to
+        filter output sectors.
+    allowed_counts : tuple[tuple[int, ...], ...]
+        Allowed photon-count signatures across ``partition_blocks``. When
+        defined, output states whose per-block occupation counts do not match
+        one of these signatures are pruned from the final output basis.
     """
 
     type: MeasurementKind
     measured_modes: tuple[int, ...] = ()
     computation_space: ComputationSpace | None = None
     grouping: LexGrouping | ModGrouping | None = None
+    partition_blocks: tuple[int, ...] = ()
+    allowed_counts: tuple[tuple[int, ...], ...] = ()
     if TYPE_CHECKING:
         # Type-checker-only legacy/compat attributes. At runtime, the metaclass
         # resolves these names to either a new API instance (NONE) or legacy enums.
@@ -265,6 +274,8 @@ class MeasurementStrategy(metaclass=_MeasurementStrategyMeta):
     def probs(
         computation_space: ComputationSpace = ComputationSpace.UNBUNCHED,
         grouping: LexGrouping | ModGrouping | None = None,
+        partition_blocks: list[int] | tuple[int, ...] | None = None,
+        allowed_counts: list[list[int] | tuple[int, ...]] | tuple[tuple[int, ...], ...] | None = None,
     ) -> MeasurementStrategy:
         """Create a probability-output measurement strategy.
 
@@ -274,6 +285,10 @@ class MeasurementStrategy(metaclass=_MeasurementStrategyMeta):
             Computation space used to enumerate the output basis.
         grouping : LexGrouping | ModGrouping | None
             Optional grouping applied to the resulting probabilities.
+        partition_blocks : list[int] | tuple[int, ...] | None
+            Optional contiguous mode-block partition used for sector filtering.
+        allowed_counts : list[list[int] | tuple[int, ...]] | tuple[tuple[int, ...], ...] | None
+            Allowed photon-count signatures across ``partition_blocks``.
 
         Returns
         -------
@@ -282,15 +297,22 @@ class MeasurementStrategy(metaclass=_MeasurementStrategyMeta):
         """
         # Full measurement returning a probability distribution.
         computation_space = ComputationSpace.coerce(computation_space)
+        blocks, counts = MeasurementStrategy._normalize_partition_selection(
+            partition_blocks, allowed_counts
+        )
         return MeasurementStrategy(
             type=MeasurementKind["PROBABILITIES"],
             computation_space=computation_space,
             grouping=grouping,
+            partition_blocks=blocks,
+            allowed_counts=counts,
         )
 
     @staticmethod
     def mode_expectations(
         computation_space: ComputationSpace = ComputationSpace.UNBUNCHED,
+        partition_blocks: list[int] | tuple[int, ...] | None = None,
+        allowed_counts: list[list[int] | tuple[int, ...]] | tuple[tuple[int, ...], ...] | None = None,
     ) -> MeasurementStrategy:
         """Create a per-mode expectation measurement strategy.
 
@@ -307,14 +329,21 @@ class MeasurementStrategy(metaclass=_MeasurementStrategyMeta):
         # Mode_expectations
         # Per-mode expectation values from the measured distribution.
         computation_space = ComputationSpace.coerce(computation_space)
+        blocks, counts = MeasurementStrategy._normalize_partition_selection(
+            partition_blocks, allowed_counts
+        )
         return MeasurementStrategy(
             type=MeasurementKind.MODE_EXPECTATIONS,
             computation_space=computation_space,
+            partition_blocks=blocks,
+            allowed_counts=counts,
         )
 
     @staticmethod
     def amplitudes(
         computation_space: ComputationSpace = ComputationSpace.UNBUNCHED,
+        partition_blocks: list[int] | tuple[int, ...] | None = None,
+        allowed_counts: list[list[int] | tuple[int, ...]] | tuple[tuple[int, ...], ...] | None = None,
     ) -> MeasurementStrategy:
         """Create an amplitude-output measurement strategy.
 
@@ -330,9 +359,14 @@ class MeasurementStrategy(metaclass=_MeasurementStrategyMeta):
         """
         # Raw amplitudes without detector/noise/sampling processing.
         computation_space = ComputationSpace.coerce(computation_space)
+        blocks, counts = MeasurementStrategy._normalize_partition_selection(
+            partition_blocks, allowed_counts
+        )
         return MeasurementStrategy(
             type=MeasurementKind.AMPLITUDES,
             computation_space=computation_space,
+            partition_blocks=blocks,
+            allowed_counts=counts,
         )
 
     @staticmethod
@@ -388,6 +422,8 @@ class MeasurementStrategy(metaclass=_MeasurementStrategyMeta):
                 and self.measured_modes == other.measured_modes
                 and self.computation_space == other.computation_space
                 and self.grouping == other.grouping
+                and self.partition_blocks == other.partition_blocks
+                and self.allowed_counts == other.allowed_counts
             )
         if isinstance(other, _LegacyMeasurementStrategy):
             return self.type.name == other.name
@@ -403,7 +439,78 @@ class MeasurementStrategy(metaclass=_MeasurementStrategyMeta):
             self.measured_modes,
             self.computation_space,
             self.grouping,
+            self.partition_blocks,
+            self.allowed_counts,
         ))
+
+    @staticmethod
+    def _normalize_partition_selection(
+        partition_blocks: list[int] | tuple[int, ...] | None,
+        allowed_counts: list[list[int] | tuple[int, ...]] | tuple[tuple[int, ...], ...] | None,
+    ) -> tuple[tuple[int, ...], tuple[tuple[int, ...], ...]]:
+        if partition_blocks is None and allowed_counts is None:
+            return (), ()
+        if partition_blocks is None or allowed_counts is None:
+            raise ValueError(
+                "partition_blocks and allowed_counts must be provided together"
+            )
+        blocks = tuple(int(size) for size in partition_blocks)
+        if not blocks or any(size <= 0 for size in blocks):
+            raise ValueError("partition_blocks must contain only positive integers")
+
+        normalized_counts = tuple(
+            tuple(int(count) for count in signature) for signature in allowed_counts
+        )
+        if not normalized_counts:
+            raise ValueError("allowed_counts cannot be empty when partition_blocks are provided")
+        if any(len(signature) != len(blocks) for signature in normalized_counts):
+            raise ValueError(
+                "Each allowed_counts signature must match the number of partition blocks"
+            )
+        if any(count < 0 for signature in normalized_counts for count in signature):
+            raise ValueError("allowed_counts must contain only non-negative integers")
+        return blocks, normalized_counts
+
+    def has_partition_selection(self) -> bool:
+        return bool(self.partition_blocks)
+
+    def validate_partition_selection(self, *, n_modes: int, n_photons: int) -> None:
+        if not self.has_partition_selection():
+            return
+        if sum(self.partition_blocks) != n_modes:
+            raise ValueError(
+                f"partition_blocks={self.partition_blocks} must sum to n_modes={n_modes}"
+            )
+        invalid = [
+            signature for signature in self.allowed_counts if sum(signature) != n_photons
+        ]
+        if invalid:
+            raise ValueError(
+                f"allowed_counts signatures must sum to n_photons={n_photons}; got {invalid}"
+            )
+
+    def build_output_map_func(
+        self, *, n_modes: int, n_photons: int
+    ) -> Callable[[tuple[int, ...]], tuple[int, ...] | None] | None:
+        if not self.has_partition_selection():
+            return None
+        self.validate_partition_selection(n_modes=n_modes, n_photons=n_photons)
+        block_offsets: list[tuple[int, int]] = []
+        start = 0
+        for size in self.partition_blocks:
+            block_offsets.append((start, start + size))
+            start += size
+        allowed = set(self.allowed_counts)
+
+        def output_map_func(state: tuple[int, ...]) -> tuple[int, ...] | None:
+            signature = tuple(
+                sum(state[left:right]) for left, right in block_offsets
+            )
+            if signature in allowed:
+                return tuple(state)
+            return None
+
+        return output_map_func
 
     def validate_modes(self, n_modes: int) -> None:
         """Validate mode indices and warn when the selection covers all modes."""

@@ -100,6 +100,20 @@ def prepare_vectorized_operations(operations_list, device=None):
     return sources, destinations, modes
 
 
+_LAYER_TARGET_COMPLEX_ELEMENTS = 1 << 18
+
+
+def _resolve_op_chunk_size(
+    num_ops: int, batch_size: int, num_input_states: int = 1
+) -> int:
+    """Choose a chunk size that bounds dense per-layer temporaries."""
+    per_op_width = max(1, batch_size * num_input_states)
+    chunk_size = _LAYER_TARGET_COMPLEX_ELEMENTS // per_op_width
+    if chunk_size <= 0:
+        return 1
+    return min(num_ops, chunk_size)
+
+
 def layer_compute_vectorized(
     unitary: torch.Tensor,
     prev_amplitudes: torch.Tensor,
@@ -131,28 +145,31 @@ def layer_compute_vectorized(
 
     # Determine output size
     next_size = int(destinations.max().item()) + 1
-    # Get unitary elements for all operations
-    # Shape: [batch_size, num_ops]
-    u_elements = unitary[:, modes.to(unitary.device), abs(p)]
-
-    # Get source amplitudes for all operations
-    # Shape: [batch_size, num_ops]
-    prev_amps = prev_amplitudes[:, sources.to(prev_amplitudes.device)]
-
-    # Compute contributions
-    # Shape: [batch_size, num_ops]
-    contributions = u_elements.to(prev_amps.device) * prev_amps
+    chunk_size = _resolve_op_chunk_size(sources.shape[0], batch_size)
 
     # Create result tensor with same dtype as input
     result = torch.zeros(
-        (batch_size, next_size), dtype=prev_amplitudes.dtype, device=destinations.device
+        (batch_size, next_size),
+        dtype=prev_amplitudes.dtype,
+        device=prev_amplitudes.device,
     )
-    # Now we can use scatter_add_ with a 2D index tensor
-    result.scatter_add_(
-        1,  # dimension to scatter on (1 for the state indices)
-        destinations.repeat(batch_size, 1),  # repeat destinations for each batch
-        contributions.to(destinations.device),  # values to add
-    )
+
+    for start in range(0, sources.shape[0], chunk_size):
+        end = min(start + chunk_size, sources.shape[0])
+        sources_chunk = sources[start:end]
+        destinations_chunk = destinations[start:end]
+        modes_chunk = modes[start:end]
+
+        # Shape: [batch_size, chunk_ops]
+        u_elements = unitary[:, modes_chunk.to(unitary.device), abs(p)]
+        prev_amps = prev_amplitudes[:, sources_chunk.to(prev_amplitudes.device)]
+        contributions = u_elements.to(prev_amps.device) * prev_amps
+
+        result.scatter_add_(
+            1,
+            destinations_chunk.to(result.device).repeat(batch_size, 1),
+            contributions.to(result.device),
+        )
 
     return result
 
@@ -224,41 +241,45 @@ def layer_compute_batch(
 
     # Determine output size
     next_size = int(destinations.max().item()) + 1
+    chunk_size = _resolve_op_chunk_size(
+        sources.shape[0], batch_size, num_input_states
+    )
 
     # Convert p to tensor for indexing
     p_tensor = torch.tensor(p, device=unitary.device, dtype=torch.long)
-
-    # Get unitary elements for all operations and input states
-    # Shape: [batch_size, num_ops, num_input_states]
-    modes_expanded = modes.unsqueeze(-1).expand(-1, num_input_states).to(unitary.device)
-    p_expanded = p_tensor.unsqueeze(0).expand(modes.shape[0], -1)
-    u_elements = unitary[:, modes_expanded, p_expanded]
-
-    # Get source amplitudes for all operations
-    # Shape: [batch_size, num_ops, num_input_states]
-    prev_amps = prev_amplitudes[:, sources.to(prev_amplitudes.device), :]
-
-    # Compute contributions
-    # Shape: [batch_size, num_ops, num_input_states]
-    contributions = u_elements.to(prev_amps.device) * prev_amps
 
     # Create result tensor with same dtype as input
     result = torch.zeros(
         (batch_size, next_size, num_input_states),
         dtype=prev_amplitudes.dtype,
-        device=destinations.device,
+        device=prev_amplitudes.device,
     )
 
-    # Scatter add contributions to result
-    # Need to expand destinations for all input states
-    destinations_expanded = (
-        destinations.unsqueeze(0).unsqueeze(-1).expand(batch_size, -1, num_input_states)
-    )
-    result.scatter_add_(
-        1,  # dimension to scatter on (1 for the state indices)
-        destinations_expanded.to(destinations.device),
-        contributions.to(destinations.device),
-    )
+    for start in range(0, sources.shape[0], chunk_size):
+        end = min(start + chunk_size, sources.shape[0])
+        sources_chunk = sources[start:end]
+        destinations_chunk = destinations[start:end]
+        modes_chunk = modes[start:end]
+
+        # Shape: [batch_size, chunk_ops, num_input_states]
+        modes_expanded = (
+            modes_chunk.unsqueeze(-1).expand(-1, num_input_states).to(unitary.device)
+        )
+        p_expanded = p_tensor.unsqueeze(0).expand(modes_chunk.shape[0], -1)
+        u_elements = unitary[:, modes_expanded, p_expanded]
+        prev_amps = prev_amplitudes[:, sources_chunk.to(prev_amplitudes.device), :]
+        contributions = u_elements.to(prev_amps.device) * prev_amps
+
+        destinations_expanded = (
+            destinations_chunk.unsqueeze(0)
+            .unsqueeze(-1)
+            .expand(batch_size, -1, num_input_states)
+        )
+        result.scatter_add_(
+            1,
+            destinations_expanded.to(result.device),
+            contributions.to(result.device),
+        )
 
     return result
 

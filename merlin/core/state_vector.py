@@ -41,6 +41,7 @@ import torch
 
 from ..utils.combinadics import Combinadics
 from ..utils.dtypes import complex_dtype_for
+from .encoding_space import EncodingSpace
 
 Scalar = float | int | complex
 
@@ -203,11 +204,14 @@ class StateVector:
     tensor: torch.Tensor
     n_modes: int
     n_photons: int
+    encoding: EncodingSpace = EncodingSpace.FOCK
     _normalized: bool = field(default=False)
 
     def __setattr__(self, name: str, value) -> None:
-        if name in ("n_modes", "n_photons") and name in self.__dict__:
-            raise AttributeError("n_modes and n_photons are immutable once set")
+        if name in ("n_modes", "n_photons", "encoding") and name in self.__dict__:
+            raise AttributeError(
+                "n_modes, n_photons, and encoding are immutable once set"
+            )
         super().__setattr__(name, value)
 
     def __getattr__(self, name: str):
@@ -262,7 +266,11 @@ class StateVector:
         """
         new_tensor = self.tensor.to(*args, **kwargs)
         return StateVector(
-            new_tensor, self.n_modes, self.n_photons, _normalized=self._normalized
+            new_tensor,
+            self.n_modes,
+            self.n_photons,
+            encoding=self.encoding,
+            _normalized=self._normalized,
         )
 
     def clone(self) -> StateVector:
@@ -277,6 +285,7 @@ class StateVector:
             self.tensor.clone(),
             self.n_modes,
             self.n_photons,
+            encoding=self.encoding,
             _normalized=self._normalized,
         )
 
@@ -292,6 +301,7 @@ class StateVector:
             self.tensor.detach(),
             self.n_modes,
             self.n_photons,
+            encoding=self.encoding,
             _normalized=self._normalized,
         )
 
@@ -524,7 +534,10 @@ class StateVector:
                     device=device or torch.device("cpu"),
                 )
                 return cls(
-                    _to_complex(zero, dtype=dtype, device=device), n_modes, n_photons
+                    _to_complex(zero, dtype=dtype, device=device),
+                    n_modes,
+                    n_photons,
+                    encoding=EncodingSpace.FOCK,
                 )
             indices = torch.tensor([indices_list], dtype=torch.long, device=device)
             values = torch.tensor(
@@ -534,7 +547,13 @@ class StateVector:
                 indices, values, (_basis_size(n_modes, n_photons),), device=device
             )
             tensor = _to_complex(tensor, dtype=dtype, device=device)
-            return cls(tensor, n_modes, n_photons, _normalized=False)
+            return cls(
+                tensor,
+                n_modes,
+                n_photons,
+                encoding=EncodingSpace.FOCK,
+                _normalized=False,
+            )
         dense = torch.zeros(
             _basis_size(n_modes, n_photons),
             dtype=complex_dtype_for(torch.float32),
@@ -549,7 +568,13 @@ class StateVector:
             )
             dense[idx] = amp_tensor
         dense = _to_complex(dense, dtype=dtype, device=device)
-        return cls(dense, n_modes, n_photons, _normalized=False)
+        return cls(
+            dense,
+            n_modes,
+            n_photons,
+            encoding=EncodingSpace.FOCK,
+            _normalized=False,
+        )
 
     @classmethod
     def from_basic_state(
@@ -598,7 +623,13 @@ class StateVector:
             )
             tensor[index] = 1.0
         tensor = _to_complex(tensor, dtype=dtype, device=device)
-        return cls(tensor, n_modes, n_photons, _normalized=True)
+        return cls(
+            tensor,
+            n_modes,
+            n_photons,
+            encoding=EncodingSpace.FOCK,
+            _normalized=True,
+        )
 
     @classmethod
     def from_tensor(
@@ -607,6 +638,7 @@ class StateVector:
         *,
         n_modes: int,
         n_photons: int,
+        encoding: EncodingSpace | None = None,
         dtype: torch.dtype | None = None,
         device: torch.device | None = None,
     ) -> StateVector:
@@ -620,6 +652,9 @@ class StateVector:
             Number of modes.
         n_photons : int
             Total photons.
+        encoding : EncodingSpace | None
+            Logical input encoding. When omitted, the tensor is treated as
+            canonical Fock-space amplitudes and stored unchanged.
         dtype : torch.dtype | None
             Optional target dtype.
         device : torch.device | None
@@ -635,10 +670,23 @@ class StateVector:
         ValueError
             If the last dimension does not match the basis size.
         """
-        basis_size = _basis_size(n_modes, n_photons)
-        _ensure_last_dim(tensor, basis_size)
+        resolved_encoding = encoding or EncodingSpace.FOCK
+        logical_basis_size = resolved_encoding.logical_basis_size(
+            n_modes=n_modes, n_photons=n_photons
+        )
+        _ensure_last_dim(tensor, logical_basis_size)
         normalized = _to_complex(tensor, dtype=dtype, device=device)
-        return cls(normalized, n_modes, n_photons, _normalized=False)
+        if resolved_encoding.kind != "fock":
+            normalized = resolved_encoding.embed(
+                normalized, n_modes=n_modes, n_photons=n_photons
+            )
+        return cls(
+            normalized,
+            n_modes,
+            n_photons,
+            encoding=resolved_encoding,
+            _normalized=False,
+        )
 
     def tensor_product(
         self,
@@ -758,14 +806,18 @@ class StateVector:
                 val_list.append(amp_scalar * val)
             if not idx_list:
                 zero = torch.zeros(size_total, dtype=dtype, device=device)
-                return StateVector(zero, m_total, n_total)
+                return StateVector(zero, m_total, n_total, encoding=self.encoding)
             indices = torch.tensor([idx_list], dtype=torch.long, device=device)
             values_tensor = torch.stack(val_list)
             tensor = torch.sparse_coo_tensor(
                 indices, values_tensor, (size_total,), device=device
             )
             return StateVector(
-                _normalize_tensor(tensor), m_total, n_total, _normalized=True
+                _normalize_tensor(tensor),
+                m_total,
+                n_total,
+                encoding=self.encoding,
+                _normalized=True,
             )
 
         other_dense = other.to_dense().to(device=device, dtype=dtype)
@@ -779,7 +831,11 @@ class StateVector:
             idx_total = comb_total.fock_to_index(combined)
             output[idx_total] = amp_scalar * other_dense[idx_other]
         return StateVector(
-            _normalize_tensor(output), m_total, n_total, _normalized=True
+            _normalize_tensor(output),
+            m_total,
+            n_total,
+            encoding=self.encoding,
+            _normalized=True,
         )
 
     def __add__(self, other: StateVector) -> StateVector:
@@ -809,7 +865,13 @@ class StateVector:
         target_sparse = self.is_sparse and other.is_sparse
         if target_sparse:
             summed = self._tensor_coalesced() + other.tensor.coalesce()
-            return StateVector(summed, self.n_modes, self.n_photons, _normalized=False)
+            return StateVector(
+                summed,
+                self.n_modes,
+                self.n_photons,
+                encoding=self.encoding,
+                _normalized=False,
+            )
         left = self.tensor.to_dense() if self.is_sparse else self.tensor
         right = other.tensor.to_dense() if other.is_sparse else other.tensor
         if right.device != left.device:
@@ -817,7 +879,13 @@ class StateVector:
         if right.dtype != left.dtype:
             right = right.to(left.dtype)
         summed = left + right
-        return StateVector(summed, self.n_modes, self.n_photons, _normalized=False)
+        return StateVector(
+            summed,
+            self.n_modes,
+            self.n_photons,
+            encoding=self.encoding,
+            _normalized=False,
+        )
 
     def __sub__(self, other: StateVector) -> StateVector:
         """Subtract two states without renormalization (lazy norm).
@@ -846,7 +914,13 @@ class StateVector:
         target_sparse = self.is_sparse and other.is_sparse
         if target_sparse:
             diff = self._tensor_coalesced() - other.tensor.coalesce()
-            return StateVector(diff, self.n_modes, self.n_photons, _normalized=False)
+            return StateVector(
+                diff,
+                self.n_modes,
+                self.n_photons,
+                encoding=self.encoding,
+                _normalized=False,
+            )
         left = self.tensor.to_dense() if self.is_sparse else self.tensor
         right = other.tensor.to_dense() if other.is_sparse else other.tensor
         if right.device != left.device:
@@ -854,7 +928,13 @@ class StateVector:
         if right.dtype != left.dtype:
             right = right.to(left.dtype)
         diff = left - right
-        return StateVector(diff, self.n_modes, self.n_photons, _normalized=False)
+        return StateVector(
+            diff,
+            self.n_modes,
+            self.n_photons,
+            encoding=self.encoding,
+            _normalized=False,
+        )
 
     def __mul__(self, scalar: Scalar) -> StateVector:
         """Scale amplitudes by a scalar (no renormalization)."""
@@ -862,10 +942,18 @@ class StateVector:
             return NotImplemented
         if self.is_sparse:
             return StateVector(
-                self.tensor * scalar, self.n_modes, self.n_photons, _normalized=False
+                self.tensor * scalar,
+                self.n_modes,
+                self.n_photons,
+                encoding=self.encoding,
+                _normalized=False,
             )
         return StateVector(
-            self.tensor * scalar, self.n_modes, self.n_photons, _normalized=False
+            self.tensor * scalar,
+            self.n_modes,
+            self.n_photons,
+            encoding=self.encoding,
+            _normalized=False,
         )
 
     def __rmul__(self, scalar: Scalar) -> StateVector:
@@ -1013,7 +1101,11 @@ class StateVector:
                 continue
             output[idx_total] = left_tensor[idx_left] * right_tensor[idx_right]
         return StateVector(
-            _normalize_tensor(output), n_modes_total, n_photons_total, _normalized=True
+            _normalize_tensor(output),
+            n_modes_total,
+            n_photons_total,
+            encoding=self.encoding,
+            _normalized=True,
         )
 
     def to_dense(self) -> torch.Tensor:

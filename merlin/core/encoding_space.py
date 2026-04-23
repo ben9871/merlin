@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from itertools import product
 from typing import ClassVar
 
+import torch
+
 from merlin.utils.combinadics import Combinadics
 
 TupleInt = tuple[int, ...]
@@ -170,6 +172,62 @@ class EncodingSpace:
             )
             return (2,) * resolved_photons
         return None
+
+    def logical_basis_size(
+        self, *, n_modes: int | None = None, n_photons: int | None = None
+    ) -> int:
+        """Alias for the logical basis size used by embedding code."""
+
+        return self.basis_size(n_modes=n_modes, n_photons=n_photons)
+
+    def embed(
+        self,
+        tensor: torch.Tensor,
+        *,
+        n_modes: int | None = None,
+        n_photons: int | None = None,
+    ) -> torch.Tensor:
+        """Embed a logical amplitude tensor into Merlin's canonical Fock basis."""
+
+        logical_size = self.logical_basis_size(n_modes=n_modes, n_photons=n_photons)
+        if tensor.shape[-1] != logical_size:
+            raise ValueError(
+                "Tensor last dimension does not match the logical basis size "
+                f"for encoding '{self.kind}': got {tensor.shape[-1]}, expected {logical_size}."
+            )
+
+        resolved_modes, resolved_photons = self._resolve_dimensions(
+            n_modes=n_modes, n_photons=n_photons
+        )
+        fock_size = Combinadics(
+            "fock", resolved_photons, resolved_modes
+        ).compute_space_size()
+        fock_indices = torch.tensor(
+            list(
+                self.logical_to_fock_indices(
+                    n_modes=n_modes, n_photons=n_photons
+                ).values()
+            ),
+            dtype=torch.long,
+            device=tensor.device,
+        )
+
+        if tensor.is_sparse:
+            coalesced = tensor.coalesce()
+            indices = coalesced.indices().clone()
+            indices[-1] = fock_indices[indices[-1]]
+            return torch.sparse_coo_tensor(
+                indices,
+                coalesced.values(),
+                coalesced.shape[:-1] + (fock_size,),
+                dtype=coalesced.dtype,
+                device=coalesced.device,
+            ).coalesce()
+
+        flat = tensor.reshape(-1, logical_size)
+        embedded = tensor.new_zeros((flat.shape[0], fock_size))
+        embedded.index_copy_(1, fock_indices, flat)
+        return embedded.view(*tensor.shape[:-1], fock_size)
 
     def logical_basis_states(
         self,

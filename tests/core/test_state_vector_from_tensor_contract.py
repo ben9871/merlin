@@ -1,6 +1,7 @@
 import pytest
 import torch
 
+from merlin.core import EncodingSpace
 from merlin.core.state_vector import StateVector
 from merlin.utils.combinadics import Combinadics
 
@@ -32,6 +33,7 @@ def test_from_tensor_default_contract_dense_preserves_fock_basis_and_raw_tensor(
 
     assert sv.n_modes == n_modes
     assert sv.n_photons == n_photons
+    assert sv.encoding is EncodingSpace.FOCK
     assert sv.basis_size == basis_size
     assert list(sv.basis) == list(basis)
     assert not sv.tensor.is_sparse
@@ -64,6 +66,7 @@ def test_from_tensor_default_contract_sparse_preserves_layout_until_dense_view(
 
     assert sv.n_modes == n_modes
     assert sv.n_photons == n_photons
+    assert sv.encoding is EncodingSpace.FOCK
     assert sv.tensor.is_sparse
     assert not sv.is_normalized
     assert torch.equal(stored.indices(), original.indices())
@@ -102,3 +105,57 @@ def test_from_tensor_default_contract_real_inputs_default_to_complex64():
 
     assert sv.tensor.dtype == torch.complex64
     assert torch.allclose(sv.tensor, tensor.to(torch.complex64))
+
+
+def test_from_tensor_with_partitioned_encoding_embeds_into_fock_space():
+    logical = torch.tensor([1.0, 2.0, 3.0, 4.0], requires_grad=True)
+    fock_basis_size = Combinadics("fock", 2, 4).compute_space_size()
+
+    sv = StateVector.from_tensor(
+        logical,
+        n_modes=4,
+        n_photons=2,
+        encoding=EncodingSpace.DUAL_RAIL,
+    )
+
+    mapping = EncodingSpace.DUAL_RAIL.logical_to_fock_indices(n_modes=4, n_photons=2)
+    expected = torch.zeros(fock_basis_size, dtype=torch.complex64)
+    for logical_idx, fock_idx in enumerate(mapping.values()):
+        expected[fock_idx] = complex(float(logical[logical_idx].item()))
+
+    assert sv.encoding is EncodingSpace.DUAL_RAIL
+    assert sv.tensor.shape == (fock_basis_size,)
+    assert torch.allclose(sv.tensor, expected)
+
+    loss = sv.tensor.real.sum()
+    loss.backward()
+    assert logical.grad is not None
+    assert torch.allclose(logical.grad, torch.ones_like(logical))
+
+
+def test_from_tensor_with_partitioned_encoding_preserves_sparse_layout():
+    indices = torch.tensor([[0, 3]])
+    values = torch.tensor([2.0 + 0j, 5.0 + 0j], dtype=torch.complex64)
+    logical = torch.sparse_coo_tensor(indices, values, (4,), dtype=torch.complex64)
+    fock_basis_size = Combinadics("fock", 2, 4).compute_space_size()
+
+    sv = StateVector.from_tensor(
+        logical,
+        n_modes=4,
+        n_photons=2,
+        encoding=EncodingSpace.DUAL_RAIL,
+    )
+
+    mapping = EncodingSpace.DUAL_RAIL.logical_to_fock_indices(n_modes=4, n_photons=2)
+    expected_indices = torch.tensor([[mapping[(0, 0)], mapping[(1, 1)]]])
+    expected = torch.sparse_coo_tensor(
+        expected_indices,
+        values,
+        (fock_basis_size,),
+        dtype=torch.complex64,
+    ).coalesce()
+
+    assert sv.encoding is EncodingSpace.DUAL_RAIL
+    assert sv.tensor.is_sparse
+    assert torch.equal(sv.tensor.coalesce().indices(), expected.indices())
+    assert torch.allclose(sv.tensor.coalesce().values(), expected.values())

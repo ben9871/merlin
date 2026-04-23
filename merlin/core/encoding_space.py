@@ -141,9 +141,12 @@ class EncodingSpace:
     ) -> int:
         """Return the number of logical basis states for this encoding."""
 
-        if self.family == "partitioned" and self.modes_per_photon is not None:
+        resolved_modes_per_photon = self.resolved_modes_per_photon(
+            n_modes=n_modes, n_photons=n_photons
+        )
+        if resolved_modes_per_photon is not None:
             size = 1
-            for width in self.modes_per_photon:
+            for width in resolved_modes_per_photon:
                 size *= width
             return size
 
@@ -154,6 +157,20 @@ class EncodingSpace:
             self.kind, resolved_photons, resolved_modes
         ).compute_space_size()
 
+    def resolved_modes_per_photon(
+        self, *, n_modes: int | None = None, n_photons: int | None = None
+    ) -> tuple[int, ...] | None:
+        """Return the resolved partition layout when the encoding is partitioned."""
+
+        if self.family == "partitioned" and self.modes_per_photon is not None:
+            return self.modes_per_photon
+        if self.kind == "dual_rail":
+            _, resolved_photons = self._resolve_dimensions(
+                n_modes=n_modes, n_photons=n_photons
+            )
+            return (2,) * resolved_photons
+        return None
+
     def logical_basis_states(
         self,
         *,
@@ -162,14 +179,15 @@ class EncodingSpace:
     ) -> tuple[TupleInt, ...]:
         """Return logical basis labels in stable embedding order."""
 
-        if self.family == "partitioned" and self.modes_per_photon is not None:
-            return self._product_basis_states(self.modes_per_photon)
+        resolved_modes_per_photon = self.resolved_modes_per_photon(
+            n_modes=n_modes, n_photons=n_photons
+        )
+        if resolved_modes_per_photon is not None:
+            return self._product_basis_states(resolved_modes_per_photon)
 
         resolved_modes, resolved_photons = self._resolve_dimensions(
             n_modes=n_modes, n_photons=n_photons
         )
-        if self.kind == "dual_rail":
-            return self._product_basis_states((2,) * resolved_photons)
         if self.kind == "unbunched":
             return tuple(
                 tuple(index for index, count in enumerate(state) if count)
@@ -203,18 +221,17 @@ class EncodingSpace:
         """Return the logical-to-Fock mapping in stable order."""
 
         logical_states = self.logical_basis_states(n_modes=n_modes, n_photons=n_photons)
-        if self.family == "partitioned" and self.modes_per_photon is not None:
+        resolved_modes_per_photon = self.resolved_modes_per_photon(
+            n_modes=n_modes, n_photons=n_photons
+        )
+        if resolved_modes_per_photon is not None:
             return self._logical_states_to_partitioned_fock_map(
-                logical_states, self.modes_per_photon
+                logical_states, resolved_modes_per_photon
             )
 
         resolved_modes, resolved_photons = self._resolve_dimensions(
             n_modes=n_modes, n_photons=n_photons
         )
-        if self.kind == "dual_rail":
-            return self._logical_states_to_partitioned_fock_map(
-                logical_states, (2,) * resolved_photons
-            )
         if self.kind == "fock":
             return {state: state for state in logical_states}
 

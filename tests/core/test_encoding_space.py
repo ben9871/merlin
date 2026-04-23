@@ -143,3 +143,27 @@ def test_dual_rail_builtin_matches_equivalent_partitioned_engine():
     assert dual_rail.logical_to_fock_indices(n_modes=6, n_photons=3) == (
         partitioned.logical_to_fock_indices()
     )
+
+
+def test_dual_rail_resolves_modes_per_photon_at_embed_time():
+    dual_rail = EncodingSpace.DUAL_RAIL
+
+    assert dual_rail.family == "partitioned"
+    assert dual_rail.kind == "dual_rail"
+    assert dual_rail.parameters == {}
+    assert dual_rail.resolved_modes_per_photon(n_modes=6, n_photons=3) == (
+        2,
+        2,
+        2,
+    )
+    assert dual_rail.basis_size(n_modes=6, n_photons=3) == 8
+    assert dual_rail.logical_basis_states(n_modes=6, n_photons=3) == (
+        (0, 0, 0),
+        (0, 0, 1),
+        (0, 1, 0),
+        (0, 1, 1),
+        (1, 0, 0),
+        (1, 0, 1),
+        (1, 1, 0),
+        (1, 1, 1),
+    )

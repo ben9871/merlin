@@ -89,6 +89,31 @@ def test_partitioned_logical_to_fock_mapping_order():
     }
 
 
+def test_partitioned_two_by_two_order_matches_example():
+    enc = EncodingSpace(modes_per_photon=[2, 2])
+
+    expected_items = [
+        ((0, 0), (1, 0, 1, 0)),
+        ((0, 1), (1, 0, 0, 1)),
+        ((1, 0), (0, 1, 1, 0)),
+        ((1, 1), (0, 1, 0, 1)),
+    ]
+
+    assert enc.logical_basis_states() == tuple(
+        logical_state for logical_state, _ in expected_items
+    )
+    assert enc.fock_basis_states() == tuple(
+        fock_state for _, fock_state in expected_items
+    )
+    assert list(enc.logical_to_fock_map().items()) == expected_items
+
+    fock_basis = Combinadics("fock", 2, 4)
+    assert enc.logical_to_fock_indices() == {
+        logical_state: fock_basis.fock_to_index(fock_state)
+        for logical_state, fock_state in expected_items
+    }
+
+
 def test_dual_rail_builtin_mapping_order():
     mapping = EncodingSpace.DUAL_RAIL.logical_to_fock_map(n_modes=4, n_photons=2)
 

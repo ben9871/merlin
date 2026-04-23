@@ -10,7 +10,9 @@ def test_builtin_encoding_space_constants():
     assert EncodingSpace.FOCK.kind == "fock"
     assert EncodingSpace.FOCK.family == "builtin"
     assert EncodingSpace.UNBUNCHED.kind == "unbunched"
+    assert EncodingSpace.UNBUNCHED.family == "builtin"
     assert EncodingSpace.DUAL_RAIL.kind == "dual_rail"
+    assert EncodingSpace.DUAL_RAIL.family == "partitioned"
 
 
 def test_partitioned_modes_per_photon_validation():
@@ -123,3 +125,21 @@ def test_dual_rail_builtin_mapping_order():
         ((1, 0), (0, 1, 1, 0)),
         ((1, 1), (0, 1, 0, 1)),
     ]
+
+
+def test_dual_rail_builtin_matches_equivalent_partitioned_engine():
+    dual_rail = EncodingSpace.DUAL_RAIL
+    partitioned = EncodingSpace(modes_per_photon=[2, 2, 2])
+
+    assert dual_rail.logical_basis_states(n_modes=6, n_photons=3) == (
+        partitioned.logical_basis_states()
+    )
+    assert dual_rail.fock_basis_states(n_modes=6, n_photons=3) == (
+        partitioned.fock_basis_states()
+    )
+    assert dual_rail.logical_to_fock_map(n_modes=6, n_photons=3) == (
+        partitioned.logical_to_fock_map()
+    )
+    assert dual_rail.logical_to_fock_indices(n_modes=6, n_photons=3) == (
+        partitioned.logical_to_fock_indices()
+    )

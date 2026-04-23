@@ -48,13 +48,20 @@ class EncodingSpace:
                     "Use EncodingSpace.FOCK, EncodingSpace.UNBUNCHED, "
                     "EncodingSpace.DUAL_RAIL, or EncodingSpace.qloq(...)."
                 )
-            if family != "builtin" or kind not in {"fock", "unbunched", "dual_rail"}:
+            if family == "builtin" and kind in {"fock", "unbunched"}:
+                object.__setattr__(self, "family", family)
+                object.__setattr__(self, "kind", kind)
+                object.__setattr__(self, "modes_per_photon", None)
+                object.__setattr__(self, "qubit_groups", None)
+                return
+            if family == "partitioned" and kind == "dual_rail":
+                object.__setattr__(self, "family", family)
+                object.__setattr__(self, "kind", kind)
+                object.__setattr__(self, "modes_per_photon", None)
+                object.__setattr__(self, "qubit_groups", None)
+                return
+            else:
                 raise ValueError("Invalid builtin encoding configuration.")
-            object.__setattr__(self, "family", family)
-            object.__setattr__(self, "kind", kind)
-            object.__setattr__(self, "modes_per_photon", None)
-            object.__setattr__(self, "qubit_groups", None)
-            return
 
         validated_modes = self._validate_positive_int_tuple(
             modes_per_photon, name="modes_per_photon"
@@ -134,9 +141,8 @@ class EncodingSpace:
     ) -> int:
         """Return the number of logical basis states for this encoding."""
 
-        if self.family == "partitioned":
+        if self.family == "partitioned" and self.modes_per_photon is not None:
             size = 1
-            assert self.modes_per_photon is not None
             for width in self.modes_per_photon:
                 size *= width
             return size
@@ -156,8 +162,7 @@ class EncodingSpace:
     ) -> tuple[TupleInt, ...]:
         """Return logical basis labels in stable embedding order."""
 
-        if self.family == "partitioned":
-            assert self.modes_per_photon is not None
+        if self.family == "partitioned" and self.modes_per_photon is not None:
             return self._product_basis_states(self.modes_per_photon)
 
         resolved_modes, resolved_photons = self._resolve_dimensions(
@@ -198,14 +203,10 @@ class EncodingSpace:
         """Return the logical-to-Fock mapping in stable order."""
 
         logical_states = self.logical_basis_states(n_modes=n_modes, n_photons=n_photons)
-        if self.family == "partitioned":
-            assert self.modes_per_photon is not None
+        if self.family == "partitioned" and self.modes_per_photon is not None:
             return self._logical_states_to_partitioned_fock_map(
                 logical_states, self.modes_per_photon
             )
-
-        if self.kind == "fock":
-            return {state: state for state in logical_states}
 
         resolved_modes, resolved_photons = self._resolve_dimensions(
             n_modes=n_modes, n_photons=n_photons
@@ -214,6 +215,8 @@ class EncodingSpace:
             return self._logical_states_to_partitioned_fock_map(
                 logical_states, (2,) * resolved_photons
             )
+        if self.kind == "fock":
+            return {state: state for state in logical_states}
 
         if self.kind == "unbunched":
             mapping: dict[TupleInt, TupleInt] = {}
@@ -251,19 +254,28 @@ class EncodingSpace:
         n_modes: int | None,
         n_photons: int | None,
     ) -> tuple[int, int]:
-        if self.family == "partitioned":
-            assert self.modes_per_photon is not None
+        if self.family == "partitioned" and self.modes_per_photon is not None:
             expected_modes = sum(self.modes_per_photon)
             expected_photons = len(self.modes_per_photon)
-            if n_modes is not None and n_modes != expected_modes:
+            resolved_modes = (
+                expected_modes
+                if n_modes is None
+                else self._validate_mode_count(n_modes)
+            )
+            resolved_photons = (
+                expected_photons
+                if n_photons is None
+                else self._validate_photon_count(n_photons)
+            )
+            if resolved_modes != expected_modes:
                 raise ValueError(
-                    f"EncodingSpace expects n_modes={expected_modes}, got {n_modes}."
+                    f"EncodingSpace expects n_modes={expected_modes}, got {resolved_modes}."
                 )
-            if n_photons is not None and n_photons != expected_photons:
+            if resolved_photons != expected_photons:
                 raise ValueError(
-                    f"EncodingSpace expects n_photons={expected_photons}, got {n_photons}."
+                    f"EncodingSpace expects n_photons={expected_photons}, got {resolved_photons}."
                 )
-            return expected_modes, expected_photons
+            return resolved_modes, resolved_photons
 
         resolved_modes = self._validate_mode_count(n_modes)
         resolved_photons = self._validate_photon_count(n_photons)
@@ -342,4 +354,4 @@ class EncodingSpace:
 
 EncodingSpace.FOCK = EncodingSpace(family="builtin", kind="fock")
 EncodingSpace.UNBUNCHED = EncodingSpace(family="builtin", kind="unbunched")
-EncodingSpace.DUAL_RAIL = EncodingSpace(family="builtin", kind="dual_rail")
+EncodingSpace.DUAL_RAIL = EncodingSpace(family="partitioned", kind="dual_rail")

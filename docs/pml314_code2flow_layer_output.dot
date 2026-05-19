@@ -1,0 +1,62 @@
+digraph G {
+concentrate=true;
+splines="ortho";
+rankdir="LR";
+node_4442ccf4 [label="98: __init__()" name="process::ComputationProcess.__init__" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_dacc7dbb [label="209: _computation_space_output_map()" name="process::ComputationProcess._computation_space_output_map" shape="rect" style="rounded,filled" fillcolor="#6db33f" ];
+node_a474505e [label="180: _setup_computation_graphs()" name="process::ComputationProcess._setup_computation_graphs" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_88d00eb2 [label="617: create()" name="process::ComputationProcessFactory.create" shape="rect" style="rounded,filled" fillcolor="#966F33" ];
+node_9873daaa [label="395: __init__()" name="slos_torchscript::SLOSComputeGraph.__init__" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_852351d5 [label="474: _build_graph_structure()" name="slos_torchscript::SLOSComputeGraph._build_graph_structure" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_596e36ae [label="573: _create_torchscript_modules()" name="slos_torchscript::SLOSComputeGraph._create_torchscript_modules" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_9ba8b663 [label="115: _get_complex_dtype_for_float()" name="slos_torchscript::_get_complex_dtype_for_float" shape="rect" style="rounded,filled" fillcolor="#6db33f" ];
+node_dc21208b [label="51: _serialize_computation_space()" name="slos_torchscript::_serialize_computation_space" shape="rect" style="rounded,filled" fillcolor="#6db33f" ];
+node_f1f7151a [label="1106: build_slos_distribution_computegraph()" name="slos_torchscript::build_slos_distribution_computegraph" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_91abb2ed [label="170: layer_compute_vectorized()" name="slos_torchscript::layer_compute_vectorized" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_ed400f38 [label="138: prepare_vectorized_operations()" name="slos_torchscript::prepare_vectorized_operations" shape="rect" style="rounded,filled" fillcolor="#6db33f" ];
+node_4442ccf4 -> node_a474505e [color="#F0E442" penwidth="2"];
+node_a474505e -> node_dacc7dbb [color="#D55E00" penwidth="2"];
+node_a474505e -> node_f1f7151a [color="#D55E00" penwidth="2"];
+node_88d00eb2 -> node_4442ccf4 [color="#56B4E9" penwidth="2"];
+node_9873daaa -> node_852351d5 [color="#56B4E9" penwidth="2"];
+node_9873daaa -> node_596e36ae [color="#56B4E9" penwidth="2"];
+node_9873daaa -> node_9ba8b663 [color="#56B4E9" penwidth="2"];
+node_852351d5 -> node_ed400f38 [color="#0072B2" penwidth="2"];
+node_596e36ae -> node_91abb2ed [color="#D55E00" penwidth="2"];
+node_f1f7151a -> node_9873daaa [color="#56B4E9" penwidth="2"];
+node_f1f7151a -> node_dc21208b [color="#56B4E9" penwidth="2"];
+subgraph cluster_fb3348ca {
+    label="File: process";
+    name="process";
+    style="filled";
+    graph[style=dotted];
+    subgraph cluster_539da8c1 {
+        node_4442ccf4 node_a474505e node_dacc7dbb;
+        label="Class: ComputationProcess";
+        name="ComputationProcess";
+        style="filled";
+        graph[style=dotted];
+    };
+    subgraph cluster_588b5c43 {
+        node_88d00eb2;
+        label="Class: ComputationProcessFactory";
+        name="ComputationProcessFactory";
+        style="filled";
+        graph[style=dotted];
+    };
+};
+subgraph cluster_47ee24b1 {
+    node_dc21208b node_9ba8b663 node_ed400f38 node_91abb2ed node_f1f7151a;
+    label="File: slos_torchscript";
+    name="slos_torchscript";
+    style="filled";
+    graph[style=dotted];
+    subgraph cluster_d7fefb4d {
+        node_9873daaa node_852351d5 node_596e36ae;
+        label="Class: SLOSComputeGraph";
+        name="SLOSComputeGraph";
+        style="filled";
+        graph[style=dotted];
+    };
+};
+}

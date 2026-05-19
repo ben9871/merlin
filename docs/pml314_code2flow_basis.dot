@@ -1,0 +1,28 @@
+digraph G {
+concentrate=true;
+splines="ortho";
+rankdir="LR";
+node_9f5a99b2 [label="614: _as_encoding_space()" name="computation_space::ComputationSpace._as_encoding_space" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_32731735 [label="502: fock_basis_states()" name="computation_space::ComputationSpace.fock_basis_states" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_cb055155 [label="397: qloq()" name="computation_space::ComputationSpace.qloq" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_5ce6ff7b [label="634: _encoding_space_cls()" name="computation_space::_encoding_space_cls" shape="rect" style="rounded,filled" fillcolor="#6db33f" ];
+node_9f5a99b2 -> node_cb055155 [color="#56B4E9" penwidth="2"];
+node_9f5a99b2 -> node_5ce6ff7b [color="#56B4E9" penwidth="2"];
+node_32731735 -> node_9f5a99b2 [color="#0072B2" penwidth="2"];
+node_32731735 -> node_32731735 [color="#0072B2" penwidth="2"];
+node_cb055155 -> node_5ce6ff7b [color="#0072B2" penwidth="2"];
+subgraph cluster_90688d65 {
+    node_5ce6ff7b;
+    label="File: computation_space";
+    name="computation_space";
+    style="filled";
+    graph[style=dotted];
+    subgraph cluster_e5819c09 {
+        node_cb055155 node_32731735 node_9f5a99b2;
+        label="Class: ComputationSpace";
+        name="ComputationSpace";
+        style="filled";
+        graph[style=dotted];
+    };
+};
+}

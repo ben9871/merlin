@@ -231,7 +231,7 @@ class FeedForwardBlock(MerlinModule):
         super().__init__()
         self.device = device or torch.device("cpu")
         self.dtype = dtype or torch.float32
-        if computation_space is not ComputationSpace.FOCK:
+        if computation_space != ComputationSpace.FOCK:
             raise ValueError(
                 "FeedForwardBlock currently only supports FOCK computation space."
             )

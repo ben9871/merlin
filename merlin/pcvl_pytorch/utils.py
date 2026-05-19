@@ -26,7 +26,6 @@ import perceval as pcvl  # type: ignore[import]
 import torch
 
 from ..core import ComputationSpace
-from ..utils import Combinadics
 
 
 def pcvl_to_tensor(
@@ -72,35 +71,21 @@ def pcvl_to_tensor(
 
     n_modes = state_vector.m
 
-    scheme = ComputationSpace.coerce(computation_space).value
-    combinadics = Combinadics(scheme, n_photons, n_modes)
-    tensor = torch.zeros(combinadics.compute_space_size(), dtype=dtype, device=device)
+    space = ComputationSpace.coerce(computation_space)
+    basis_states = space.fock_basis_states(n_modes=n_modes, n_photons=n_photons)
+    state_to_index = {state: index for index, state in enumerate(basis_states)}
+    tensor = torch.zeros(len(basis_states), dtype=dtype, device=device)
 
     # Perceval StateVector iteration yields (basic_state, amplitude)
     for bs, amplitude in state_vector:
         state = list(bs)
 
         # Validate constraints for restricted computation spaces
-        if (
-            computation_space is ComputationSpace.UNBUNCHED
-            or computation_space is ComputationSpace.DUAL_RAIL
-        ):
-            if any(count > 1 for count in state):
-                raise ValueError(
-                    "unbunched and dual_rail compute spaces do not support basis states with photon bunching."
-                )
-
-        if computation_space is ComputationSpace.DUAL_RAIL:
-            if n_photons * 2 != n_modes:
-                raise ValueError(
-                    "dual_rail compute space requires n_photons = m // 2 where m is the number of modes."
-                )
-            if any(state[i] + state[i + 1] != 1 for i in range(0, len(state), 2)):
-                raise ValueError(
-                    "dual_rail compute space requires each pair of modes to contain exactly one photon."
-                )
-
-        index = combinadics.fock_to_index(state)
+        index = state_to_index.get(tuple(state))
+        if index is None:
+            raise ValueError(
+                f"State {tuple(state)} is not part of computation_space={space}."
+            )
         tensor[index] = amplitude
 
     return tensor

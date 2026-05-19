@@ -192,10 +192,7 @@ class ModeExpectations(nn.Module):
 
         # Create mask and register as buffer
         keys_tensor = torch.tensor(keys, dtype=torch.long)
-        if computation_space in {
-            ComputationSpace.UNBUNCHED,
-            ComputationSpace.DUAL_RAIL,
-        }:
+        if computation_space.requires_postselection:
             mask = (keys_tensor >= 1).T.to(dtype=resolved_dtype)
         else:
             mask = keys_tensor.T.to(dtype=resolved_dtype)

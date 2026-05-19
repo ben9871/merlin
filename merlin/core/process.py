@@ -147,7 +147,7 @@ class ComputationProcess(AbstractComputationProcess):
         if computation_space is None:
             computation_space = ComputationSpace.UNBUNCHED
 
-        self.computation_space = computation_space
+        self.computation_space = ComputationSpace.coerce(computation_space)
         self.output_map_func = output_map_func
         self._input_basis_states_cache: list[tuple[int, ...]] | None = None
 
@@ -188,14 +188,44 @@ class ComputationProcess(AbstractComputationProcess):
         )
 
         # Build simulation graph with correct parameters
+        output_map_func = self.output_map_func
+        if output_map_func is None and self.computation_space not in {
+            ComputationSpace.FOCK,
+            ComputationSpace.UNBUNCHED,
+            ComputationSpace.DUAL_RAIL,
+        }:
+            output_map_func = self._computation_space_output_map()
+
         self.simulation_graph = build_slos_distribution_computegraph(
             m=self.m,  # Number of modes
             n_photons=self.n_photons,  # Total number of photons
+            output_map_func=output_map_func,
             computation_space=self.computation_space,
             keep_keys=True,  # Usually want to keep keys for output interpretation
             device=self.device,
             dtype=self.dtype,
         )
+
+    def _computation_space_output_map(self):
+        """Return a final-state filter for custom computation spaces.
+
+        Custom computation spaces are output filters. The current SLOS graph is
+        still built over the full Fock transition space, and this map keeps only
+        states retained by the configured ComputationSpace.
+        """
+        allowed_states = set(
+            self.computation_space.fock_basis_states(
+                n_modes=self.m, n_photons=self.n_photons
+            )
+        )
+
+        def keep_selected_output(
+            state: tuple[int, ...] | list[int],
+        ) -> tuple[int, ...] | None:
+            state_tuple = tuple(int(value) for value in state)
+            return state_tuple if state_tuple in allowed_states else None
+
+        return keep_selected_output
 
     def compute(self, parameters: list[torch.Tensor]) -> torch.Tensor:
         """Compute output amplitudes for the configured input state.

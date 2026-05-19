@@ -361,7 +361,7 @@ class QuantumLayer(MerlinModule):
             self.input_state = input_state
         elif n_photons is not None:
             # Default behavior: place [1,0,1,0,...] in dual-rail, else distribute photons across modes
-            if self.computation_space is ComputationSpace.DUAL_RAIL:
+            if self.computation_space == ComputationSpace.DUAL_RAIL:
                 self.input_state = pcvl.BasicState(tuple([1, 0] * n_photons))
             elif not self.amplitude_encoding:
                 self.input_state = generate_state(

@@ -301,43 +301,35 @@ def embed_tensor_in_fock_basis(
     fock_basis = _basis_for(n_modes, n_photons)
 
     space = ComputationSpace.coerce(computation_space)
-    candidate_schemes: list[str] = []
-    if space is ComputationSpace.UNBUNCHED:
-        candidate_schemes.append("unbunched")
-    elif space is ComputationSpace.DUAL_RAIL:
-        candidate_schemes.append("dual_rail")
-    elif space is ComputationSpace.FOCK:
-        # Preserve the current compact-input behaviour for collision-free
-        # states in Fock mode until explicit encoding selection lands.
-        candidate_schemes.append("unbunched")
+    if space != ComputationSpace.FOCK:
+        logical_size = space.basis_size(n_modes=n_modes, n_photons=n_photons)
+        if feature_dim == logical_size:
+            indices = list(
+                space.logical_to_fock_indices(
+                    n_modes=n_modes, n_photons=n_photons
+                ).values()
+            )
+            return _remap_last_dim(tensor, indices, fock_size)
 
-    for scheme in candidate_schemes:
-        try:
-            logical_basis = Combinadics(scheme, n_photons, n_modes)
-        except ValueError:
-            continue
-        if feature_dim != logical_basis.compute_space_size():
-            continue
-        indices = [fock_basis.fock_to_index(state) for state in logical_basis]
-        return _remap_last_dim(tensor, indices, fock_size)
+    # Preserve the current compact-input behaviour for collision-free states in
+    # Fock mode until all input paths use explicit EncodingSpace selection.
+    if space == ComputationSpace.FOCK and n_photons <= n_modes:
+        logical_basis = Combinadics("unbunched", n_photons, n_modes)
+        if feature_dim == logical_basis.compute_space_size():
+            indices = [fock_basis.fock_to_index(state) for state in logical_basis]
+            return _remap_last_dim(tensor, indices, fock_size)
 
-    if space is ComputationSpace.FOCK:
+    if space == ComputationSpace.FOCK:
         detail = (
             f"expected either Fock size {fock_size} or compact unbunched size "
             f"{Combinadics('unbunched', n_photons, n_modes).compute_space_size()}"
             if n_photons <= n_modes
             else f"expected Fock size {fock_size}"
         )
-    elif space is ComputationSpace.UNBUNCHED:
-        detail = (
-            f"expected compact unbunched size "
-            f"{Combinadics('unbunched', n_photons, n_modes).compute_space_size()} "
-            f"or full Fock size {fock_size}"
-        )
     else:
         detail = (
-            f"expected compact dual_rail size "
-            f"{Combinadics('dual_rail', n_photons, n_modes).compute_space_size()} "
+            f"expected compact {space.value} size "
+            f"{space.basis_size(n_modes=n_modes, n_photons=n_photons)} "
             f"or full Fock size {fock_size}"
         )
     raise ValueError(

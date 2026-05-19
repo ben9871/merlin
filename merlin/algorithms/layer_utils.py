@@ -405,7 +405,7 @@ def prepare_input_state(
 
     # === Generate default state from n_photons ===
     if input_state is None and n_photons is not None:
-        if computation_space is ComputationSpace.DUAL_RAIL:
+        if computation_space == ComputationSpace.DUAL_RAIL:
             return pcvl.BasicState(tuple([1, 0] * n_photons)), n_photons
         elif amplitude_encoding:
             if circuit_m is None:
@@ -652,7 +652,7 @@ def setup_noise_and_detectors(
     has_custom_detectors = not empty_detectors
     detector_warnings: list[str] = []
 
-    if has_custom_detectors and computation_space is not ComputationSpace.FOCK:
+    if has_custom_detectors and computation_space != ComputationSpace.FOCK:
         detectors = [pcvl.Detector.pnr()] * circuit.m
         detector_warnings.append(
             f"Detectors are ignored in favor of ComputationSpace: {computation_space}"

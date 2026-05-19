@@ -65,10 +65,7 @@ def normalize_probabilities(
         Normalized probability tensor. For computation spaces that do not
         require renormalization, the input tensor is returned unchanged.
     """
-    if computation_space not in (
-        ComputationSpace.UNBUNCHED,
-        ComputationSpace.DUAL_RAIL,
-    ):
+    if computation_space is None or not computation_space.requires_postselection:
         return probabilities
 
     sum_probs = probabilities.sum(dim=-1, keepdim=True)
@@ -103,10 +100,7 @@ def normalize_probabilities_and_amplitudes(
     """
     probabilities = probabilities_from_amplitudes(amplitudes)
 
-    if computation_space in (
-        ComputationSpace.UNBUNCHED,
-        ComputationSpace.DUAL_RAIL,
-    ):
+    if computation_space is not None and computation_space.requires_postselection:
         sum_probs = probabilities.sum(dim=-1, keepdim=True)
         valid_entries = sum_probs > 0
         if valid_entries.any():

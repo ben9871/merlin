@@ -750,7 +750,7 @@ class FidelityKernel(MerlinModule):
         self.input_state = input_state
         self.shots = shots or 0
         self.sampling_method = sampling_method
-        self.no_bunching = self.computation_space is not ComputationSpace.FOCK
+        self.no_bunching = self.computation_space != ComputationSpace.FOCK
         self.force_psd = force_psd
         base_device = device if device is not None else feature_map.device
         self.device = (
@@ -786,14 +786,14 @@ class FidelityKernel(MerlinModule):
                 "Experiment circuit must have the same number of modes as the feature map circuit."
             )
 
-        if max(input_state) > 1 and self.computation_space is not ComputationSpace.FOCK:
+        if max(input_state) > 1 and self.computation_space != ComputationSpace.FOCK:
             raise ValueError(
                 f"Bunching must be enabled for an input state with"
                 f"{max(input_state)} in one mode."
             )
         elif (
             all(x == 1 for x in input_state)
-            and self.computation_space is not ComputationSpace.FOCK
+            and self.computation_space != ComputationSpace.FOCK
         ):
             raise ValueError(
                 "For non-FOCK computation_space, the kernel value will always be 1 "
@@ -806,7 +806,7 @@ class FidelityKernel(MerlinModule):
         # Verify that no Detector was defined in experiment if using non-FOCK space:
         if (
             not self._empty_detectors
-            and self.computation_space is not ComputationSpace.FOCK
+            and self.computation_space != ComputationSpace.FOCK
         ):
             raise RuntimeError(
                 "computation_space must be FOCK if Experiment contains at least one Detector."
@@ -963,7 +963,8 @@ class FidelityKernel(MerlinModule):
             ])
             if isinstance(x2, torch.Tensor):
                 U_adjoint = torch.stack([
-                    self.feature_map.compute_unitary(x)
+                    self.feature_map
+                    .compute_unitary(x)
                     .transpose(0, 1)
                     .conj()
                     .to(x1.device)

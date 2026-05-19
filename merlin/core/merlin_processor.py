@@ -19,6 +19,7 @@ from torch.futures import Future
 
 from ..algorithms.module import MerlinModule
 from ..utils.combinadics import Combinadics
+from .computation_space import ComputationSpace
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +188,11 @@ class MerlinProcessor:
             val = getattr(cs, "value", None)
             if isinstance(val, str) and val in ("fock", "unbunched", "dual_rail"):
                 return val
+            if isinstance(cs, ComputationSpace):
+                raise ValueError(
+                    "Remote execution currently supports only built-in "
+                    "ComputationSpace values: fock, unbunched, and dual_rail."
+                )
             # Fallback: match by enum name
             name = getattr(cs, "name", "")
             if name == "UNBUNCHED":

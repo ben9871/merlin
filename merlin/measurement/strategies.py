@@ -263,14 +263,14 @@ class MeasurementStrategy(metaclass=_MeasurementStrategyMeta):
 
     @staticmethod
     def probs(
-        computation_space: ComputationSpace = ComputationSpace.UNBUNCHED,
+        computation_space: ComputationSpace | str = ComputationSpace.UNBUNCHED,
         grouping: LexGrouping | ModGrouping | None = None,
     ) -> MeasurementStrategy:
         """Create a probability-output measurement strategy.
 
         Parameters
         ----------
-        computation_space : ComputationSpace
+        computation_space : ComputationSpace | str
             Computation space used to enumerate the output basis.
         grouping : LexGrouping | ModGrouping | None
             Optional grouping applied to the resulting probabilities.
@@ -290,13 +290,13 @@ class MeasurementStrategy(metaclass=_MeasurementStrategyMeta):
 
     @staticmethod
     def mode_expectations(
-        computation_space: ComputationSpace = ComputationSpace.UNBUNCHED,
+        computation_space: ComputationSpace | str = ComputationSpace.UNBUNCHED,
     ) -> MeasurementStrategy:
         """Create a per-mode expectation measurement strategy.
 
         Parameters
         ----------
-        computation_space : ComputationSpace
+        computation_space : ComputationSpace | str
             Computation space used to enumerate the output basis.
 
         Returns
@@ -314,13 +314,13 @@ class MeasurementStrategy(metaclass=_MeasurementStrategyMeta):
 
     @staticmethod
     def amplitudes(
-        computation_space: ComputationSpace = ComputationSpace.UNBUNCHED,
+        computation_space: ComputationSpace | str = ComputationSpace.UNBUNCHED,
     ) -> MeasurementStrategy:
         """Create an amplitude-output measurement strategy.
 
         Parameters
         ----------
-        computation_space : ComputationSpace
+        computation_space : ComputationSpace | str
             Computation space used to enumerate the output basis.
 
         Returns
@@ -338,7 +338,7 @@ class MeasurementStrategy(metaclass=_MeasurementStrategyMeta):
     @staticmethod
     def partial(
         modes: list[int],
-        computation_space: ComputationSpace = ComputationSpace.UNBUNCHED,
+        computation_space: ComputationSpace | str = ComputationSpace.UNBUNCHED,
         grouping: LexGrouping | ModGrouping | None = None,
     ) -> MeasurementStrategy:
         """Create a partial measurement on the given mode indices.
@@ -348,7 +348,7 @@ class MeasurementStrategy(metaclass=_MeasurementStrategyMeta):
         ----------
         modes : list[int]
             Mode indices to measure.
-        computation_space : ComputationSpace
+        computation_space : ComputationSpace | str
             Computation space used to enumerate the output basis.
         grouping : LexGrouping | ModGrouping | None
             Optional grouping applied to the resulting probabilities only.

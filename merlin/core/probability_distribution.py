@@ -72,7 +72,32 @@ class FilteredBasis:
 
 @cache
 def _basis_for_space(space: ComputationSpace, n_modes: int, n_photons: int) -> Basis:
-    return Combinadics(space.value, n_photons, n_modes)
+    if space in {
+        ComputationSpace.FOCK,
+        ComputationSpace.UNBUNCHED,
+        ComputationSpace.DUAL_RAIL,
+    }:
+        return Combinadics(space.value, n_photons, n_modes)
+    return space.fock_basis_states(n_modes=n_modes, n_photons=n_photons)
+
+
+def _space_predicate(
+    space: ComputationSpace, *, n_modes: int, n_photons: int
+) -> Callable[[tuple[int, ...]], bool]:
+    """Return a Fock-state predicate for a computation-space filter."""
+    if space == ComputationSpace.FOCK:
+
+        def fock_ok(state: tuple[int, ...]) -> bool:
+            return True
+
+        return fock_ok
+
+    allowed = set(space.fock_basis_states(n_modes=n_modes, n_photons=n_photons))
+
+    def space_ok(state: tuple[int, ...]) -> bool:
+        return tuple(state) in allowed
+
+    return space_ok
 
 
 @cache
@@ -626,38 +651,11 @@ class ProbabilityDistribution:
             rule = rule[0]
 
         if isinstance(rule, (str, ComputationSpace)):
-            normalized = rule.lower() if isinstance(rule, str) else rule.value
-            if normalized == "dual_rail":
-                normalized = ComputationSpace.DUAL_RAIL.value
-            space = ComputationSpace.coerce(normalized)
+            space = ComputationSpace.coerce(rule)
             target_space = space
-            if space is ComputationSpace.FOCK:
-
-                def predicate(state: tuple[int, ...]) -> bool:
-                    return True
-
-            elif space is ComputationSpace.UNBUNCHED:
-
-                def predicate(state: tuple[int, ...]) -> bool:
-                    return all(x <= 1 for x in state)
-
-            elif space is ComputationSpace.DUAL_RAIL:
-                if self.n_modes % 2 != 0 or self.n_photons * 2 != self.n_modes:
-                    raise ValueError(
-                        "DUAL_RAIL requires even mode count with one photon per rail pair."
-                    )
-                pair_count = self.n_modes // 2
-
-                def dual_rail_ok(state: tuple[int, ...]) -> bool:
-                    for i in range(pair_count):
-                        a, b = state[2 * i], state[2 * i + 1]
-                        if a + b != 1:
-                            return False
-                    return True
-
-                predicate = dual_rail_ok
-            else:
-                raise ValueError("Unknown computation space filter")
+            predicate = _space_predicate(
+                space, n_modes=self.n_modes, n_photons=self.n_photons
+            )
         elif callable(rule):
             predicate = cast(Callable[[tuple[int, ...]], bool], rule)
         else:
@@ -758,7 +756,7 @@ class ProbabilityDistribution:
             )
 
         dense = self.to_dense()
-        if target_space in (ComputationSpace.UNBUNCHED, ComputationSpace.DUAL_RAIL):
+        if target_space is not None and target_space != ComputationSpace.FOCK:
             target_basis = _basis_for_space(target_space, self.n_modes, self.n_photons)
             src_index = {state: idx for idx, state in enumerate(iter_basis)}
             gather_src: list[int] = []

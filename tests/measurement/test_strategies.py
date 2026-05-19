@@ -71,6 +71,43 @@ class TestMeasurementStrategy:
         s2 = MeasurementStrategy.probs(ComputationSpace.FOCK)
         assert s1 == s2
 
+    def test_factories_accept_partitioned_computation_space(self):
+        space = ComputationSpace(modes_per_photon=[3, 2])
+
+        assert MeasurementStrategy.probs(space).computation_space == space
+        assert MeasurementStrategy.mode_expectations(space).computation_space == space
+        assert MeasurementStrategy.amplitudes(space).computation_space == space
+        assert (
+            MeasurementStrategy.partial([0], computation_space=space).computation_space
+            == space
+        )
+
+    def test_factories_accept_qloq_computation_space(self):
+        qloq = ComputationSpace.qloq([2, 1])
+
+        strategy = MeasurementStrategy.probs(computation_space=qloq)
+
+        assert strategy.computation_space == qloq
+        assert strategy.computation_space.modes_per_photon == (4, 2)
+
+    def test_qloq_computation_space_selects_quantum_layer_outputs(self):
+        qloq = ComputationSpace.qloq([2, 1])
+        layer = QuantumLayer(
+            circuit=pcvl.Circuit(6),
+            input_size=0,
+            input_state=[1, 0, 0, 0, 1, 0],
+            measurement_strategy=MeasurementStrategy.probs(qloq),
+        )
+
+        result = layer()
+
+        assert result.shape == (1, 8)
+        assert torch.allclose(
+            result,
+            torch.tensor([[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]),
+        )
+        assert layer.output_keys == list(qloq.fock_basis_states())
+
     def test_partial_factory_creation_noncontiguous_modes(self):
         """Ensure factory wires fields without reordering sparse modes."""
         strategy = MeasurementStrategy.partial(

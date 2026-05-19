@@ -31,6 +31,7 @@ configuration, which can then be reused for multiple unitary evaluations.
 
 import math
 import os
+import warnings
 from collections.abc import Callable
 
 import torch
@@ -43,6 +44,72 @@ from merlin.utils.normalization import (
     normalize_probabilities,
     probabilities_from_amplitudes,
 )
+
+_BUILTIN_COMPUTATION_SPACE_VALUES = {"fock", "unbunched", "dual_rail"}
+
+
+def _serialize_computation_space(space: ComputationSpace) -> str | dict[str, object]:
+    """Serialize a computation space for SLOS graph metadata.
+
+    Parameters
+    ----------
+    space : ComputationSpace
+        Computation space stored on the graph.
+
+    Returns
+    -------
+    str | dict[str, object]
+        Legacy string for built-ins, or structured metadata for custom spaces.
+    """
+    if space.value in _BUILTIN_COMPUTATION_SPACE_VALUES:
+        return space.value
+    return {
+        "family": space.family,
+        "kind": space.kind,
+        "parameters": space.parameters,
+    }
+
+
+def _deserialize_computation_space(value: object) -> ComputationSpace:
+    """Deserialize SLOS graph computation-space metadata.
+
+    Parameters
+    ----------
+    value : object
+        Legacy string metadata or structured custom-space metadata.
+
+    Returns
+    -------
+    ComputationSpace
+        Reconstructed computation space.
+
+    Raises
+    ------
+    ValueError
+        If the metadata cannot describe a supported computation space.
+    """
+    if isinstance(value, str):
+        return ComputationSpace.coerce(value)
+    if isinstance(value, dict):
+        parameters = value.get("parameters", {})
+        if not isinstance(parameters, dict):
+            raise ValueError("Invalid computation-space metadata parameters.")
+        kind = value.get("kind")
+        family = value.get("family")
+        if kind == "qloq":
+            qubit_groups = parameters.get("qubit_groups")
+            if qubit_groups is None:
+                raise ValueError("QLOQ metadata requires qubit_groups.")
+            return ComputationSpace.qloq(qubit_groups)
+        modes_per_photon = parameters.get("modes_per_photon")
+        if modes_per_photon is None:
+            raise ValueError("Custom metadata requires modes_per_photon.")
+        return ComputationSpace(
+            modes_per_photon,
+            family=str(family) if family is not None else None,
+            kind=str(kind) if kind is not None else None,
+        )
+    raise ValueError("Invalid computation-space metadata.")
 
 
 def _get_complex_dtype_for_float(dtype: torch.dtype) -> torch.dtype:
@@ -369,7 +436,8 @@ class SLOSComputeGraph:
         self.m = m
         self.n_photons = n_photons
         self.output_map_func = output_map_func
-        if computation_space is ComputationSpace.DUAL_RAIL:
+        computation_space = ComputationSpace.coerce(computation_space)
+        if computation_space == ComputationSpace.DUAL_RAIL:
             if m % 2 != 0:
                 raise ValueError("dual_rail compute space requires even m")
             if n_photons != m // 2:
@@ -428,7 +496,7 @@ class SLOSComputeGraph:
                         and nstate[i]
                     ):
                         continue
-                    if self.computation_space is ComputationSpace.DUAL_RAIL:
+                    if self.computation_space == ComputationSpace.DUAL_RAIL:
                         pair_start = (i // 2) * 2
                         if nstate[pair_start] + nstate[pair_start + 1] >= 1:
                             continue
@@ -528,7 +596,6 @@ class SLOSComputeGraph:
         # Create mapping function if needed
         if self.output_map_func is not None:
 
-            @jit.script
             def apply_mapping(
                 probabilities: torch.Tensor,
                 target_indices: torch.Tensor,
@@ -563,7 +630,15 @@ class SLOSComputeGraph:
 
                 return normalized_result
 
-            self.mapping_function = lambda probs: apply_mapping(
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="`torch.jit.script` is deprecated.*",
+                    category=DeprecationWarning,
+                )
+                scripted_apply_mapping = jit.script(apply_mapping)
+
+            self.mapping_function = lambda probs: scripted_apply_mapping(
                 probs, self.target_indices, self.total_mapped_keys
             )
         else:
@@ -606,13 +681,13 @@ class SLOSComputeGraph:
         if any(n < 0 for n in input_state) or sum(input_state) == 0:
             raise ValueError("Photon numbers cannot be negative or all zeros")
 
-        if self.computation_space is ComputationSpace.UNBUNCHED and not all(
+        if self.computation_space == ComputationSpace.UNBUNCHED and not all(
             x in (0, 1) for x in input_state
         ):
             raise ValueError(
                 "Input state must be binary (0s and 1s only) in unbunched mode"
             )
-        if self.computation_space is ComputationSpace.DUAL_RAIL:
+        if self.computation_space == ComputationSpace.DUAL_RAIL:
             for k in range(0, self.m, 2):
                 if input_state[k] + input_state[k + 1] != 1:
                     raise ValueError(
@@ -712,13 +787,13 @@ class SLOSComputeGraph:
         if any(n < 0 for n in input_states[0]) or sum(input_states[0]) == 0:
             raise ValueError("Photon numbers cannot be negative or all zeros")
 
-        if self.computation_space is ComputationSpace.UNBUNCHED and not all(
+        if self.computation_space == ComputationSpace.UNBUNCHED and not all(
             x in (0, 1) for x in input_states[0]
         ):
             raise ValueError(
                 "Input state must be binary (0s and 1s only) in unbunched mode"
             )
-        if self.computation_space is ComputationSpace.DUAL_RAIL:
+        if self.computation_space == ComputationSpace.DUAL_RAIL:
             for k in range(0, self.m, 2):
                 if input_states[0][k] + input_states[0][k + 1] != 1:
                     raise ValueError(
@@ -913,13 +988,13 @@ class SLOSComputeGraph:
         if any(n < 0 for n in input_state) or sum(input_state) == 0:
             raise ValueError("Photon numbers cannot be negative or all zeros")
 
-        if self.computation_space is ComputationSpace.UNBUNCHED and not all(
+        if self.computation_space == ComputationSpace.UNBUNCHED and not all(
             x in (0, 1) for x in input_state
         ):
             raise ValueError(
                 "Input state must be binary (0s and 1s only) in unbunched mode"
             )
-        if self.computation_space is ComputationSpace.DUAL_RAIL:
+        if self.computation_space == ComputationSpace.DUAL_RAIL:
             for k in range(0, self.m, 2):
                 if input_state[k] + input_state[k + 1] != 1:
                     raise ValueError(
@@ -1075,6 +1150,8 @@ def build_slos_distribution_computegraph(
 
     if computation_space is None:
         computation_space = ComputationSpace.UNBUNCHED
+    else:
+        computation_space = ComputationSpace.coerce(computation_space)
 
     compute_graph = SLOSComputeGraph(
         m,
@@ -1106,7 +1183,9 @@ def build_slos_distribution_computegraph(
         metadata = {
             "m": compute_graph.m,
             "n_photons": compute_graph.n_photons,
-            "computation_space": compute_graph.computation_space.value,
+            "computation_space": _serialize_computation_space(
+                compute_graph.computation_space
+            ),
             "keep_keys": compute_graph.keep_keys,
             "dtype_str": str(compute_graph.dtype),
             "has_output_map_func": output_map_func is not None,
@@ -1179,7 +1258,9 @@ def load_slos_distribution_computegraph(path):
     # Create a minimal graph instance
     m = metadata["m"]
     n_photons = metadata["n_photons"]
-    computation_space = ComputationSpace.coerce(metadata.get("computation_space"))
+    computation_space = _deserialize_computation_space(
+        metadata.get("computation_space")
+    )
     keep_keys = metadata["keep_keys"]
 
     # Parse dtype

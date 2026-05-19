@@ -100,6 +100,31 @@ def test_filter_dual_rail_invalid_geometry_raises():
         _ = pd.filter(ComputationSpace.DUAL_RAIL)
 
 
+def test_filter_qloq_dense_uses_qloq_output_order():
+    qloq = ComputationSpace.qloq([2, 1])
+    probe = ProbabilityDistribution.from_tensor(torch.ones(21), n_modes=6, n_photons=2)
+    probs = torch.zeros(probe.basis_size)
+    first = probe.basis.index((1, 0, 0, 0, 1, 0))
+    fourth = probe.basis.index((0, 1, 0, 0, 0, 1))
+    rejected = probe.basis.index((2, 0, 0, 0, 0, 0))
+    probs[first] = 0.25
+    probs[fourth] = 0.25
+    probs[rejected] = 0.5
+
+    filtered = ProbabilityDistribution.from_tensor(
+        probs, n_modes=6, n_photons=2
+    ).filter(qloq)
+
+    assert filtered.computation_space == qloq
+    assert filtered.basis_size == 8
+    assert list(filtered.basis) == list(qloq.fock_basis_states())
+    assert torch.allclose(
+        filtered.to_dense(),
+        torch.tensor([0.5, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0]),
+    )
+    assert torch.isclose(filtered.logical_performance, torch.tensor(0.5))
+
+
 def test_filter_combined_space_and_predicate():
     # start with uniform mass over Fock(4 modes, 2 photons); 10 states total
     probe = ProbabilityDistribution.from_tensor(torch.ones(10), n_modes=4, n_photons=2)

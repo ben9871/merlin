@@ -57,11 +57,18 @@ The :class:`~merlin.algorithms.layer.QuantumLayer` configures its computation sp
 construction time. 
 
 The ``measurement_strategy`` can define the computation space with its ``computation_space`` argument.
-We can choose from:
+We can choose from the built-in spaces:
 
 - ``merlin.ComputationSpace.UNBUNCHED``, do not allow multiple photons per modes. It is the default value when no MeasurementStrategy is given.
 - ``merlin.ComputationSpace.FOCK``, allow multiple photons per modes (i.e. explore the full Fock space).
 - ``merlin.ComputationSpace.DUAL_RAIL``, use a dual rail encoding (two modes per photon).
+
+``ComputationSpace`` also accepts structured output spaces:
+
+- ``merlin.ComputationSpace(modes_per_photon=[...])`` keeps one photon in each configured mode block.
+- ``merlin.ComputationSpace.qloq(qubit_groups=[...])`` expands each group ``k`` to ``2**k`` modes.
+
+These structured spaces are output filters. They do not embed input amplitudes; they select and order the output states returned by measurement strategies. The input-side equivalent is ``EncodingSpace``.
 
 Those computation spaces can also be assigned with the ``computation_space`` argument in the constructor but, it
 is preferred to exploit the ``measurement_strategy`` since ``computation_space`` will be deprecated in the future.
@@ -108,23 +115,23 @@ Example setup
 
    import perceval as pcvl
    import torch
-   from merlin import MeasurementStrategy,ComputationSpace QuantumLayer
+   from merlin import ComputationSpace, MeasurementStrategy, QuantumLayer
 
    # 3 logical qubits: first two qubits in a 4-mode block, third qubit dual-railed
-   qubit_groups = [2, 1]
-   n_photons = len(qubit_groups)
-   n_modes = sum(2**k for k in qubit_groups)  # 6 modes
+   output_space = ComputationSpace.qloq(qubit_groups=[2, 1])
+   n_photons = output_space.n_photons
+   n_modes = output_space.n_modes
 
    circuit = pcvl.Circuit(n_modes)
    layer = QuantumLayer(
        input_size=0,
        circuit=circuit,
        n_photons=n_photons,
-       measurement_strategy=MeasurementStrategy.probs(computation_space=ComputationSpace.UNBUNCHED), # stay inside the unbunched/QLOQ space
+       measurement_strategy=MeasurementStrategy.probs(computation_space=output_space),
        dtype=torch.float32,
    )
 
-   # Later you would feed a superposition state (or a QuantumBridge payload) into layer(...)
+   # The output probabilities are ordered by output_space.fock_basis_states().
 
 Bridging qubit logic and photonics
 ----------------------------------

@@ -43,6 +43,7 @@ from ..core.partial_measurement import PartialMeasurement
 from ..core.probability_distribution import ProbabilityDistribution
 from ..core.process import ComputationProcessFactory
 from ..core.state import StatePattern, generate_state
+from ..core.state_mixture import StateMixture, StateMixtureBranch
 from ..core.state_vector import StateVector, embed_tensor_in_fock_basis
 from ..measurement import OutputMapper
 from ..measurement.autodiff import AutoDiffProcess
@@ -387,9 +388,9 @@ class QuantumLayer(MerlinModule):
             )
             statevector_input = self.input_state
         elif isinstance(self.input_state, torch.Tensor):
-            resolved_n_photons = (
-                n_photons  # n_photons must be provided for tensor input
-            )
+            if n_photons is None:
+                raise ValueError("n_photons must be provided for tensor input_state.")
+            resolved_n_photons = n_photons
             process_input_state = self._embed_amplitude_tensor(
                 self._validate_amplitude_input(self.input_state)
             )
@@ -678,7 +679,7 @@ class QuantumLayer(MerlinModule):
             return embed_tensor_in_fock_basis(
                 amplitude,
                 n_modes=self.circuit.m,
-                n_photons=self.n_photons,
+                n_photons=self._required_n_photons(),
                 computation_space=self.computation_space,
             )
         except ValueError as exc:
@@ -774,13 +775,226 @@ class QuantumLayer(MerlinModule):
 
         return params
 
+    def _extract_state_mixture_input(
+        self,
+        input_parameters: tuple[
+            torch.Tensor | StateVector | PartialMeasurement | StateMixture, ...
+        ],
+    ) -> StateMixture | None:
+        """Return a branch mixture input after validating exclusive usage."""
+        mixture_inputs = [
+            value
+            for value in input_parameters
+            if isinstance(value, (PartialMeasurement, StateMixture))
+        ]
+        if not mixture_inputs:
+            return None
+        if len(input_parameters) != 1:
+            raise TypeError(
+                "Cannot mix PartialMeasurement or StateMixture inputs with "
+                "torch.Tensor or StateVector inputs in the same forward() call."
+            )
+        mixture_source = mixture_inputs[0]
+        if isinstance(mixture_source, PartialMeasurement):
+            return mixture_source.to_state_mixture()
+        return mixture_source
+
+    def _forward_state_mixture(
+        self,
+        mixture: StateMixture,
+        *,
+        shots: int | None,
+        sampling_method: str | None,
+        simultaneous_processes: int | None,
+    ) -> torch.Tensor | StateMixture:
+        """Propagate each mixture branch and recombine by measurement kind."""
+        if int(shots or 0) > 0:
+            raise RuntimeError(
+                "StateMixture propagation currently supports exact execution "
+                "only; pass shots=None or shots=0."
+            )
+
+        branch_outputs: list[
+            torch.Tensor | PartialMeasurement | StateVector | ProbabilityDistribution
+        ] = []
+        for branch in mixture:
+            self._validate_state_mixture_branch(branch)
+            branch_output = self.forward(
+                branch.state,
+                shots=shots,
+                sampling_method=sampling_method,
+                simultaneous_processes=simultaneous_processes,
+            )
+            if isinstance(branch_output, StateMixture):
+                raise TypeError("StateMixture branch propagation cannot nest mixtures.")
+            branch_outputs.append(branch_output)
+
+        kind = _resolve_measurement_kind(self.measurement_strategy)
+        if kind == MeasurementKind.AMPLITUDES:
+            return self._state_mixture_from_amplitude_outputs(mixture, branch_outputs)
+        if kind == MeasurementKind.PARTIAL:
+            return self._state_mixture_from_nested_partials(mixture, branch_outputs)
+        return self._weighted_state_mixture_tensor(mixture, branch_outputs)
+
+    def _validate_state_mixture_branch(self, branch: StateMixtureBranch) -> None:
+        """Validate that a mixture branch can be propagated by this layer."""
+        if self.circuit is None or not hasattr(self.circuit, "m"):
+            raise TypeError("StateMixture propagation requires a circuit-backed layer.")
+        n_photons = self._required_n_photons()
+        if branch.state.n_modes != self.circuit.m:
+            raise ValueError(
+                "StateMixture branch state has incompatible mode count: "
+                f"got n_modes={branch.state.n_modes}, expected {self.circuit.m}."
+            )
+        if branch.state.n_photons != n_photons:
+            raise ValueError(
+                "StateMixture branch state has incompatible photon count: "
+                f"got n_photons={branch.state.n_photons}, expected {n_photons}."
+            )
+
+    def _required_n_photons(self) -> int:
+        """Return the concrete photon count required for amplitude execution."""
+        if self.n_photons is None:
+            raise ValueError("QuantumLayer amplitude execution requires n_photons.")
+        return self.n_photons
+
+    def _output_n_modes(self) -> int:
+        """Return the concrete output mode count for typed output objects."""
+        if self.circuit is not None and hasattr(self.circuit, "m"):
+            return int(self.circuit.m)
+        input_state = self.input_state
+        if input_state is not None and hasattr(input_state, "__len__"):
+            return len(input_state)
+        raise ValueError("QuantumLayer output object construction requires n_modes.")
+
+    def _state_mixture_from_amplitude_outputs(
+        self,
+        mixture: StateMixture,
+        branch_outputs: list[
+            torch.Tensor | PartialMeasurement | StateVector | ProbabilityDistribution
+        ],
+    ) -> StateMixture:
+        """Wrap per-branch amplitude outputs in a new mixture."""
+        branches: list[StateMixtureBranch] = []
+        for branch, output in zip(mixture, branch_outputs, strict=True):
+            if isinstance(output, StateVector):
+                state = output
+            elif isinstance(output, torch.Tensor):
+                state = StateVector(
+                    output,
+                    n_modes=self.circuit.m,
+                    n_photons=self._required_n_photons(),
+                )
+            else:
+                raise TypeError(
+                    "Amplitude branch propagation returned an unexpected "
+                    f"output type: {type(output).__name__}."
+                )
+            branches.append(
+                StateMixtureBranch(
+                    probability=branch.probability,
+                    state=state,
+                    outcomes=branch.outcomes,
+                )
+            )
+        return StateMixture(
+            branches=tuple(branches),
+            measured_modes=mixture.measured_modes,
+            unmeasured_modes=mixture.unmeasured_modes,
+        )
+
+    def _state_mixture_from_nested_partials(
+        self,
+        mixture: StateMixture,
+        branch_outputs: list[
+            torch.Tensor | PartialMeasurement | StateVector | ProbabilityDistribution
+        ],
+    ) -> StateMixture:
+        """Merge nested partial measurements into one mixture."""
+        merged_branches: list[StateMixtureBranch] = []
+        nested_measured_modes: tuple[int, ...] = ()
+        nested_unmeasured_modes: tuple[int, ...] = ()
+        for branch, output in zip(mixture, branch_outputs, strict=True):
+            if not isinstance(output, PartialMeasurement):
+                raise TypeError(
+                    "Partial branch propagation returned an unexpected output "
+                    f"type: {type(output).__name__}."
+                )
+            nested = output.to_state_mixture()
+            nested_measured_modes = nested.measured_modes
+            nested_unmeasured_modes = nested.unmeasured_modes
+            for nested_branch in nested:
+                merged_branches.append(
+                    StateMixtureBranch(
+                        probability=branch.probability * nested_branch.probability,
+                        state=nested_branch.state,
+                        outcomes=branch.outcomes + nested_branch.outcomes,
+                    )
+                )
+        return StateMixture(
+            branches=tuple(merged_branches),
+            measured_modes=mixture.measured_modes + nested_measured_modes,
+            unmeasured_modes=nested_unmeasured_modes,
+        )
+
+    def _weighted_state_mixture_tensor(
+        self,
+        mixture: StateMixture,
+        branch_outputs: list[
+            torch.Tensor | PartialMeasurement | StateVector | ProbabilityDistribution
+        ],
+    ) -> torch.Tensor:
+        """Return probability-weighted tensor recombination of branch outputs."""
+        weighted_outputs: list[torch.Tensor] = []
+        for branch, output in zip(mixture, branch_outputs, strict=True):
+            tensor = self._tensor_from_branch_output(output)
+            probability = self._reshape_branch_probability(branch.probability, tensor)
+            weighted_outputs.append(probability * tensor)
+        return torch.stack(weighted_outputs, dim=0).sum(dim=0)
+
+    @staticmethod
+    def _tensor_from_branch_output(
+        output: torch.Tensor
+        | PartialMeasurement
+        | StateVector
+        | ProbabilityDistribution,
+    ) -> torch.Tensor:
+        """Return tensor data from a recombinable branch output."""
+        if isinstance(output, torch.Tensor):
+            return output
+        if isinstance(output, ProbabilityDistribution):
+            return output.tensor
+        raise TypeError(
+            "StateMixture probability recombination expected tensor-like branch "
+            f"outputs, got {type(output).__name__}."
+        )
+
+    @staticmethod
+    def _reshape_branch_probability(
+        probability: torch.Tensor, output: torch.Tensor
+    ) -> torch.Tensor:
+        """Reshape branch probabilities so they broadcast over output tensors."""
+        if probability.ndim == 0:
+            return probability
+        trailing_dims = max(output.ndim - probability.ndim, 0)
+        return probability.reshape((*probability.shape, *((1,) * trailing_dims)))
+
     def forward(
         self,
-        *input_parameters: torch.Tensor | StateVector,
+        *input_parameters: torch.Tensor
+        | StateVector
+        | PartialMeasurement
+        | StateMixture,
         shots: int | None = None,
         sampling_method: str | None = None,
         simultaneous_processes: int | None = None,
-    ) -> torch.Tensor | PartialMeasurement | StateVector | ProbabilityDistribution:
+    ) -> (
+        torch.Tensor
+        | PartialMeasurement
+        | StateVector
+        | ProbabilityDistribution
+        | StateMixture
+    ):
         """Forward pass through the quantum layer.
 
         Encoding is inferred from the input type:
@@ -788,12 +1002,17 @@ class QuantumLayer(MerlinModule):
         - ``torch.Tensor`` (float): angle encoding (compatible with ``nn.Sequential``)
         - ``torch.Tensor`` (complex): amplitude encoding
         - :class:`~merlin.core.state_vector.StateVector`: amplitude encoding (preferred for quantum state injection)
+        - :class:`~merlin.core.partial_measurement.PartialMeasurement`: branch-mixture propagation
+        - :class:`~merlin.core.state_mixture.StateMixture`: branch-mixture propagation
 
         Parameters
         ----------
-        input_parameters : torch.Tensor | merlin.core.state_vector.StateVector
+        input_parameters : torch.Tensor | merlin.core.state_vector.StateVector | PartialMeasurement | StateMixture
             Input data. For angle encoding, pass float tensors. For amplitude
-            encoding, pass a single :class:`~merlin.core.state_vector.StateVector` or complex tensor.
+            encoding, pass a single :class:`~merlin.core.state_vector.StateVector`
+            or complex tensor. For branch propagation, pass a single
+            :class:`~merlin.core.partial_measurement.PartialMeasurement` or
+            :class:`~merlin.core.state_mixture.StateMixture`.
         shots : int | None
             Number of samples; if 0 or None, return exact amplitudes/probabilities.
         sampling_method : str | None
@@ -803,7 +1022,7 @@ class QuantumLayer(MerlinModule):
 
         Returns
         -------
-        torch.Tensor | PartialMeasurement | merlin.core.state_vector.StateVector | ProbabilityDistribution
+        torch.Tensor | PartialMeasurement | merlin.core.state_vector.StateVector | ProbabilityDistribution | StateMixture
             Output after measurement mapping.
             Depending on the return_object argument and measurement strategy defined in the input, the output
             type will be different. Check the constructor for more details.
@@ -811,12 +1030,21 @@ class QuantumLayer(MerlinModule):
         Raises
         ------
         TypeError
-            If inputs mix ``torch.Tensor`` and ``StateVector``, or if an
-            unsupported input type is provided.
+            If inputs mix ``torch.Tensor`` and ``StateVector`` or branch-mixture
+            inputs, or if an unsupported input type is provided.
         ValueError
             If multiple ``StateVector`` inputs are provided.
         """
         # Phase 1: Input classification and validation
+        mixture_input = self._extract_state_mixture_input(input_parameters)
+        if mixture_input is not None:
+            return self._forward_state_mixture(
+                mixture_input,
+                shots=shots,
+                sampling_method=sampling_method,
+                simultaneous_processes=simultaneous_processes,
+            )
+
         tensor_inputs: list[torch.Tensor] = []
         amplitude_input: torch.Tensor | None = None
         original_input_state = None
@@ -989,14 +1217,14 @@ class QuantumLayer(MerlinModule):
             ):
                 return ProbabilityDistribution(
                     self.measurement_mapping(results),
-                    n_modes=len(self.input_state),
-                    n_photons=self.n_photons,
+                    n_modes=self._output_n_modes(),
+                    n_photons=self._required_n_photons(),
                     computation_space=self.computation_space,
                 )
             return StateVector(
                 self.measurement_mapping(results),
-                n_modes=len(self.input_state),
-                n_photons=self.n_photons,
+                n_modes=self._output_n_modes(),
+                n_photons=self._required_n_photons(),
             )
 
         return self.measurement_mapping(results)

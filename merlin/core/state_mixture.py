@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-"""Classical mixtures of conditional state-vector branches."""
+"""Ensemble representations of density matrices from conditional state branches."""
 
 from __future__ import annotations
 
@@ -35,13 +35,13 @@ from .state_vector import StateVector
 if TYPE_CHECKING:
     from .partial_measurement import PartialMeasurement
 
-Outcome = tuple[int, ...]
-OutcomeHistory = tuple[Outcome, ...]
+_Outcome = tuple[int, ...]
+_OutcomeHistory = tuple[_Outcome, ...]
 
 
-def _normalize_outcome_history(outcomes: OutcomeHistory) -> OutcomeHistory:
+def _normalize_outcome_history(outcomes: _OutcomeHistory) -> _OutcomeHistory:
     """Validate and normalize a branch outcome history."""
-    normalized: list[Outcome] = []
+    normalized: list[_Outcome] = []
     for outcome in outcomes:
         if not isinstance(outcome, tuple):
             raise TypeError("StateMixtureBranch outcomes must be tuples of integers.")
@@ -65,7 +65,7 @@ def _state_batch_shape(state: StateVector) -> tuple[int, ...]:
 
 @dataclass(frozen=True)
 class StateMixtureBranch:
-    """Single branch of a classical mixture of pure conditional states.
+    """Single branch of an ensemble representation of a density matrix.
 
     Parameters
     ----------
@@ -92,7 +92,7 @@ class StateMixtureBranch:
 
     probability: torch.Tensor
     state: StateVector
-    outcomes: OutcomeHistory = field(default_factory=tuple)
+    outcomes: _OutcomeHistory = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         """Validate branch probability, state, and outcome metadata."""
@@ -126,12 +126,15 @@ class StateMixtureBranch:
 
 @dataclass(frozen=True)
 class StateMixture:
-    """Classical mixture of conditional :class:`merlin.core.state_vector.StateVector` branches.
+    """Ensemble representation of a density matrix built from pure-state branches.
 
     ``StateMixture`` is the propagatable carrier produced after a partial
-    measurement. It stores classical branch probabilities separately from the
-    conditional pure states, so downstream layers can propagate each branch and
-    recombine tensor outputs by probability.
+    measurement. It stores branch probabilities separately from the conditional
+    pure states, representing ``rho = sum_i p_i |psi_i><psi_i|`` without
+    materializing the dense density matrix. Downstream layers propagate each
+    branch and recombine tensor outputs by probability. Compatible dense branch
+    states may be fused into a larger state-vector batch for propagation, but
+    recombination is always performed in the original branch order.
 
     Parameters
     ----------
@@ -216,7 +219,7 @@ class StateMixture:
         return tuple(branch.state for branch in self.branches)
 
     @property
-    def outcomes(self) -> tuple[Outcome, ...]:
+    def outcomes(self) -> tuple[_Outcome, ...]:
         """Return the latest outcome for each branch.
 
         Returns
@@ -230,7 +233,7 @@ class StateMixture:
         )
 
     @property
-    def outcome_histories(self) -> tuple[OutcomeHistory, ...]:
+    def outcome_histories(self) -> tuple[_OutcomeHistory, ...]:
         """Return complete outcome histories in branch order.
 
         Returns
@@ -252,7 +255,8 @@ class StateMixture:
         Returns
         -------
         StateMixture
-            Classical mixture with one branch per partial-measurement branch.
+            Density-matrix ensemble representation with one branch per
+            partial-measurement branch.
 
         Raises
         ------

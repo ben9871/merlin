@@ -35,6 +35,8 @@ Modules
      - The high-level :class:`~merlin.core.merlin_processor.MerlinProcessor` remote/local execution interface.
    * - :doc:`merlin.core.state`
      - State-pattern helpers and input-state generation utilities.
+   * - :doc:`merlin.core.state_mixture`
+     - Density-matrix ensemble representations of conditional state-vector branches produced by partial measurement.
    * - :doc:`merlin.core.state_vector`
      - The public :class:`~merlin.core.state_vector.StateVector` object and related conversions.
 
@@ -53,4 +55,5 @@ Modules
    merlin.core.process
    merlin.core.merlin_processor
    merlin.core.state
+   merlin.core.state_mixture
    merlin.core.state_vector

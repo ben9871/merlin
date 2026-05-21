@@ -189,9 +189,9 @@ class PartialMeasurement:
         Returns
         -------
         merlin.core.state_mixture.StateMixture
-            Classical mixture whose branches carry the same probabilities,
-            conditional states, and measured outcomes as this partial
-            measurement.
+            Density-matrix ensemble representation whose branches carry the
+            same probabilities, conditional states, and measured outcomes as
+            this partial measurement.
         """
         from merlin.core.state_mixture import StateMixture
 

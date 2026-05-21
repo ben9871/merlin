@@ -77,6 +77,27 @@ The :class:`PartialMeasurement` class provides convenient access to the measurem
    for outcome, branch in zip(pm.outcomes, pm.branches):
        print(f"Outcome {outcome}: probability={branch.probability}, amplitude shape={branch.amplitudes.shape}")
 
+Propagating a Partial Measurement
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``PartialMeasurement`` is an inspectable measurement record. It can also be
+passed directly into a later ``QuantumLayer``; the layer converts it into a
+:class:`~merlin.core.state_mixture.StateMixture` internally and propagates each
+conditional branch.
+
+.. code-block:: python
+
+   partial = partial_layer()
+   output = next_layer(partial)
+
+Call :meth:`PartialMeasurement.to_state_mixture` when explicit access to the
+propagatable branch carrier is useful:
+
+.. code-block:: python
+
+   mixture = partial.to_state_mixture()
+   histories = mixture.outcome_histories
+
 Working with Grouped Probabilities
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

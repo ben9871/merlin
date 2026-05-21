@@ -49,6 +49,8 @@ from .core.encoding_space import EncodingSpace
 from .core.merlin_processor import MerlinProcessor
 from .core.process import ComputationProcess
 from .core.state import StatePattern, generate_state
+from .core.state_mixture import StateMixture, StateMixtureBranch
+from .core.state_vector import StateVector
 from .measurement import (
     Amplitudes,
     DetectorTransform,
@@ -82,6 +84,9 @@ __all__ = [
     # Advanced components
     "ComputationProcess",
     "StatePattern",
+    "StateMixture",
+    "StateMixtureBranch",
+    "StateVector",
     "generate_state",
     "OutputMapper",
     "Probabilities",

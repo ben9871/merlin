@@ -30,6 +30,7 @@ from .encoding_space import EncodingSpace
 from .probability_distribution import ProbabilityDistribution
 from .process import ComputationProcess, ComputationProcessFactory
 from .state import StatePattern, generate_state
+from .state_mixture import StateMixture, StateMixtureBranch
 from .state_vector import StateVector
 
 __all__ = [
@@ -45,6 +46,8 @@ __all__ = [
     "BeamSplitter",
     "EntanglingBlock",
     "Circuit",
+    "StateMixture",
+    "StateMixtureBranch",
     "StateVector",
     "ProbabilityDistribution",
 ]

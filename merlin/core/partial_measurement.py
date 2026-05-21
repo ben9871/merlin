@@ -22,10 +22,14 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import torch
 
 from merlin.core.state_vector import StateVector
+
+if TYPE_CHECKING:
+    from merlin.core.state_mixture import StateMixture
 
 DetectorTransformOutput = list[
     dict[tuple[int | None, ...], list[tuple[torch.Tensor, torch.Tensor]]]
@@ -178,6 +182,20 @@ class PartialMeasurement:
     def probabilities(self) -> torch.Tensor:
         """torch.Tensor: Alias for :attr:`tensor`."""
         return self.tensor
+
+    def to_state_mixture(self) -> "StateMixture":
+        """Return this partial measurement as a propagatable state mixture.
+
+        Returns
+        -------
+        merlin.core.state_mixture.StateMixture
+            Classical mixture whose branches carry the same probabilities,
+            conditional states, and measured outcomes as this partial
+            measurement.
+        """
+        from merlin.core.state_mixture import StateMixture
+
+        return StateMixture.from_partial_measurement(self)
 
     @property
     def amplitudes(self):

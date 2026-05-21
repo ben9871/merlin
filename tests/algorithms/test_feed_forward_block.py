@@ -18,10 +18,14 @@ from perceval.algorithm import Sampler
 from perceval.components import PERM
 from perceval.utils import NoiseModel
 
-from merlin.algorithms.feed_forward import FeedForwardBlock
+from merlin.algorithms.feed_forward import BranchState, FeedForwardBlock
 from merlin.algorithms.layer import QuantumLayer
 from merlin.core.computation_space import ComputationSpace
+from merlin.core.partial_measurement import PartialMeasurement
+from merlin.core.state_mixture import StateMixture, StateMixtureBranch
+from merlin.core.state_vector import StateVector
 from merlin.measurement.strategies import MeasurementStrategy
+from merlin.utils.combinadics import Combinadics
 
 _BASIS_CACHE: dict[tuple[int, int], list[tuple[int, ...]]] = {}
 
@@ -29,15 +33,9 @@ _BASIS_CACHE: dict[tuple[int, int], list[tuple[int, ...]]] = {}
 def _basis_states(n_modes: int, n_photons: int) -> list[tuple[int, ...]]:
     cache_key = (n_modes, n_photons)
     if cache_key not in _BASIS_CACHE:
-        layer = QuantumLayer(
-            input_size=0,
-            circuit=pcvl.Circuit(n_modes),
-            n_photons=n_photons,
-            measurement_strategy=MeasurementStrategy.probs(
-                computation_space=ComputationSpace.FOCK
-            ),
-        )
-        _BASIS_CACHE[cache_key] = layer.computation_process.simulation_graph.mapped_keys
+        _BASIS_CACHE[cache_key] = Combinadics(
+            "fock", n_photons, n_modes
+        ).enumerate_states()
     return _BASIS_CACHE[cache_key]
 
 
@@ -385,6 +383,80 @@ def _build_feedforward_experiment(detector) -> tuple[pcvl.Experiment, list[int]]
     return exp
 
 
+def _build_multi_threshold_feedforward_experiment() -> pcvl.Experiment:
+    m = 5
+    n_measured_modes = 3
+    input_state = [1, 1, 1, 1, 1]
+
+    exp = pcvl.Experiment()
+    root = Circuit(m)
+    root.add(0, _fourier_unitary(m))
+    for mode in range(4):
+        root.add((mode, mode + 1), pcvl.BS())
+    exp.add(0, root)
+
+    for mode in range(n_measured_modes):
+        exp.add(mode, pcvl.Detector.threshold())
+
+    n_remaining_modes = m - n_measured_modes
+    default_branch = Circuit(n_remaining_modes)
+    default_branch.add(0, _fourier_unitary(n_remaining_modes))
+
+    adaptive_branch = Circuit(n_remaining_modes)
+    adaptive_branch.add(0, PERM(list(reversed(range(n_remaining_modes)))))
+    adaptive_branch.add(0, _fourier_unitary(n_remaining_modes))
+
+    provider = pcvl.FFCircuitProvider(n_measured_modes, 0, default_branch)
+    provider.add_configuration([1] * n_measured_modes, adaptive_branch)
+    exp.add(0, provider)
+    exp.with_input(BasicState(input_state))
+    return exp
+
+
+def _nontrivial_downstream_layer(n_modes: int, n_photons: int) -> QuantumLayer:
+    circuit = Circuit(n_modes)
+    circuit.add(0, _fourier_unitary(n_modes))
+    for mode in range(n_modes - 1):
+        circuit.add((mode, mode + 1), pcvl.BS())
+    circuit.add(0, _fourier_unitary(n_modes))
+    return QuantumLayer(
+        input_size=0,
+        circuit=circuit,
+        input_state=[n_photons, *([0] * (n_modes - 1))],
+        n_photons=n_photons,
+        measurement_strategy=MeasurementStrategy.probs(ComputationSpace.FOCK),
+    )
+
+
+def _first_compatible_feedforward_mixture(block: FeedForwardBlock) -> StateMixture:
+    for measurement_key, branch_list in _feedforward_branch_states(block).items():
+        grouped: dict[int, list[BranchState]] = defaultdict(list)
+        for branch in branch_list:
+            if branch.remaining_n > 0:
+                grouped[branch.remaining_n].append(branch)
+        for _remaining_n, branches in grouped.items():
+            if len(branches) < 2:
+                continue
+            unmeasured_modes = [
+                idx for idx, value in enumerate(measurement_key) if value is None
+            ]
+            return StateMixture(
+                branches=tuple(
+                    _state_mixture_branch_from_feedforward_branch(
+                        measurement_key, branch
+                    )
+                    for branch in branches
+                ),
+                measured_modes=tuple(
+                    idx
+                    for idx, value in enumerate(measurement_key)
+                    if value is not None
+                ),
+                unmeasured_modes=tuple(unmeasured_modes),
+            )
+    raise AssertionError("Expected at least one compatible feed-forward branch group.")
+
+
 def _perceval_probabilities(exp: pcvl.Experiment) -> dict[tuple[int, ...], float]:
     processor = pcvl.Processor("SLOS", exp)
     sampler = Sampler(processor)
@@ -411,6 +483,366 @@ def _block_probabilities(
     return {block.output_keys[idx]: float(batch[idx]) for idx in range(batch.shape[0])}
 
 
+def _state_mixture_branch_from_feedforward_branch(
+    measurement_key: tuple[int | None, ...],
+    branch: BranchState,
+) -> StateMixtureBranch:
+    unmeasured_modes = [
+        idx for idx, value in enumerate(measurement_key) if value is None
+    ]
+    standard_basis = _basis_states(len(unmeasured_modes), branch.remaining_n)
+    amplitudes = branch.amplitudes
+    if branch.basis_keys and branch.basis_keys != tuple(standard_basis):
+        source_indices = {state: idx for idx, state in enumerate(branch.basis_keys)}
+        reindexed = torch.zeros(
+            *amplitudes.shape[:-1],
+            len(standard_basis),
+            dtype=amplitudes.dtype,
+            device=amplitudes.device,
+        )
+        for target_index, state in enumerate(standard_basis):
+            source_index = source_indices.get(state)
+            if source_index is not None:
+                reindexed[..., target_index] = amplitudes[..., source_index]
+        amplitudes = reindexed
+    measured_outcome = tuple(
+        int(value) for value in measurement_key if value is not None
+    )
+    return StateMixtureBranch(
+        probability=torch.nan_to_num(branch.weight, nan=0.0),
+        state=StateVector(
+            amplitudes,
+            n_modes=len(unmeasured_modes),
+            n_photons=branch.remaining_n,
+        ),
+        outcomes=(measured_outcome,),
+    )
+
+
+def _feedforward_branch_states(
+    block: FeedForwardBlock,
+) -> dict[tuple[int | None, ...], list[BranchState]]:
+    feature_tensor = block._prepare_classical_features(None)
+    branches = block._run_stage(block._stage_runtimes[0], feature_tensor)
+    for runtime in block._stage_runtimes[1:]:
+        branches = block._propagate_future_stage(branches, runtime)
+    return branches
+
+
+def _probabilities_from_raw_feedforward_branches(
+    block: FeedForwardBlock,
+) -> dict[tuple[int, ...], float]:
+    grouped_branches: dict[
+        tuple[tuple[int | None, ...], int], list[StateMixtureBranch]
+    ] = defaultdict(list)
+    reconstructed: defaultdict[tuple[int, ...], float] = defaultdict(float)
+    for measurement_key, branch_list in _feedforward_branch_states(block).items():
+        for branch in branch_list:
+            if branch.remaining_n == 0:
+                full_key = list(measurement_key)
+                for mode_idx, value in enumerate(full_key):
+                    if value is None:
+                        full_key[mode_idx] = 0
+                probability = torch.nan_to_num(branch.weight, nan=0.0)
+                if probability.ndim == 0:
+                    reconstructed[tuple(int(value) for value in full_key)] += float(
+                        probability
+                    )
+                    continue
+                if probability.shape[0] != 1:
+                    raise AssertionError("Test expects a single batch item.")
+                reconstructed[tuple(int(value) for value in full_key)] += float(
+                    probability[0]
+                )
+                continue
+            grouped_branches[(measurement_key, branch.remaining_n)].append(
+                _state_mixture_branch_from_feedforward_branch(measurement_key, branch)
+            )
+
+    for (measurement_key, remaining_n), branches in grouped_branches.items():
+        unmeasured_modes = [
+            idx for idx, value in enumerate(measurement_key) if value is None
+        ]
+        mixture = StateMixture(
+            branches=tuple(branches),
+            measured_modes=tuple(
+                idx for idx, value in enumerate(measurement_key) if value is not None
+            ),
+            unmeasured_modes=tuple(unmeasured_modes),
+        )
+        layer = QuantumLayer(
+            input_size=0,
+            circuit=pcvl.Circuit(len(unmeasured_modes)),
+            input_state=[remaining_n, *([0] * (len(unmeasured_modes) - 1))],
+            n_photons=remaining_n,
+            measurement_strategy=MeasurementStrategy.probs(ComputationSpace.FOCK),
+        )
+        remaining_probabilities = layer(mixture)
+        if remaining_probabilities.ndim == 1:
+            remaining_probabilities = remaining_probabilities.unsqueeze(0)
+        for basis_index, basis_state in enumerate(
+            _basis_states(len(unmeasured_modes), remaining_n)
+        ):
+            full_key = list(measurement_key)
+            for mode_idx, value in zip(unmeasured_modes, basis_state, strict=False):
+                full_key[mode_idx] = value
+            reconstructed[tuple(int(value) for value in full_key)] += float(
+                remaining_probabilities[0, basis_index]
+            )
+    return dict(reconstructed)
+
+
+def _probabilities_from_state_mixture_feedforward_operations(
+    block: FeedForwardBlock, *, require_batched_multi_branch: bool = False
+) -> dict[tuple[int, ...], float]:
+    if len(block._stage_runtimes) != 1:
+        raise AssertionError("Test helper supports one-stage feed-forward blocks only.")
+    runtime = block._stage_runtimes[0]
+    if runtime.pre_layer is None or runtime.detector_transform is None:
+        raise AssertionError("Feed-forward runtime is not fully initialized.")
+
+    call_args: list[torch.Tensor] = []
+    if runtime.initial_amplitudes is not None:
+        call_args.append(runtime.initial_amplitudes)
+    if runtime.classical_input_size:
+        call_args.append(block._prepare_classical_features(None))
+    amplitudes = runtime.pre_layer(*call_args) if call_args else runtime.pre_layer()
+    measurement_data = runtime.detector_transform(amplitudes)
+    grouped_branches: dict[
+        tuple[tuple[int | None, ...], tuple[int, ...], int],
+        list[StateMixtureBranch],
+    ] = defaultdict(list)
+
+    for remaining_n, bucket in enumerate(measurement_data):
+        for measurement_key, entries in bucket.items():
+            global_key = block._merge_measurement_key(None, runtime, measurement_key)
+            reduced_key = block._reduce_measurement_values(
+                measurement_key, runtime.measured_modes
+            )
+            unmeasured_modes = [
+                idx for idx, value in enumerate(measurement_key) if value is None
+            ]
+            for probability, branch_amplitudes in entries:
+                grouped_branches[(global_key, reduced_key, remaining_n)].append(
+                    StateMixtureBranch(
+                        probability=probability,
+                        state=StateVector(
+                            branch_amplitudes,
+                            n_modes=len(unmeasured_modes),
+                            n_photons=remaining_n,
+                        ),
+                        outcomes=(reduced_key,),
+                    )
+                )
+
+    reconstructed: defaultdict[tuple[int, ...], float] = defaultdict(float)
+    batched_multi_branch_groups = 0
+    for (global_key, reduced_key, remaining_n), branches in grouped_branches.items():
+        unmeasured_modes = [
+            idx for idx, value in enumerate(global_key) if value is None
+        ]
+        mixture = StateMixture(
+            branches=tuple(branches),
+            measured_modes=runtime.measured_modes,
+            unmeasured_modes=tuple(unmeasured_modes),
+        )
+        if remaining_n == 0:
+            full_key = tuple(0 if value is None else int(value) for value in global_key)
+            for branch in mixture:
+                probability = branch.probability
+                if probability.ndim == 0:
+                    reconstructed[full_key] += float(probability)
+                else:
+                    reconstructed[full_key] += float(probability[0])
+            continue
+
+        conditional_layer = block._select_conditional_layer(
+            runtime, reduced_key, remaining_n
+        )
+        propagated = mixture
+        if conditional_layer is not None:
+            expected_dim = len(
+                conditional_layer.computation_process.simulation_graph.mapped_keys
+            )
+            if mixture.branches[0].state.tensor.shape[-1] == expected_dim:
+                restore = None
+                if require_batched_multi_branch and len(mixture) > 1:
+                    batched_multi_branch_groups += 1
+                    restore = conditional_layer._state_mixture_branch_outputs
+                    conditional_layer._state_mixture_branch_outputs = (
+                        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                            AssertionError(
+                                "StateMixture feed-forward conditional propagation "
+                                "used the sequential branch path."
+                            )
+                        )
+                    )
+                try:
+                    conditional_output = conditional_layer(mixture)
+                finally:
+                    if restore is not None:
+                        conditional_layer._state_mixture_branch_outputs = restore
+                assert isinstance(conditional_output, StateMixture)
+                propagated = conditional_output
+
+        probability_layer = QuantumLayer(
+            input_size=0,
+            circuit=pcvl.Circuit(len(unmeasured_modes)),
+            input_state=[remaining_n, *([0] * (len(unmeasured_modes) - 1))],
+            n_photons=remaining_n,
+            measurement_strategy=MeasurementStrategy.probs(ComputationSpace.FOCK),
+        )
+        remaining_probabilities = probability_layer(propagated)
+        if remaining_probabilities.ndim == 1:
+            remaining_probabilities = remaining_probabilities.unsqueeze(0)
+        for basis_index, basis_state in enumerate(
+            _basis_states(len(unmeasured_modes), remaining_n)
+        ):
+            full_key = list(global_key)
+            for mode_idx, value in zip(unmeasured_modes, basis_state, strict=False):
+                full_key[mode_idx] = value
+            reconstructed[tuple(int(value) for value in full_key)] += float(
+                remaining_probabilities[0, basis_index]
+            )
+
+    if require_batched_multi_branch and batched_multi_branch_groups == 0:
+        raise AssertionError("Expected a compatible multi-branch StateMixture group.")
+    return dict(reconstructed)
+
+
+def _first_stage_partial_measurement_layer(block: FeedForwardBlock) -> QuantumLayer:
+    runtime = block._stage_runtimes[0]
+    if block._base_input_state is None:
+        raise AssertionError("PartialMeasurement test requires a basis input state.")
+
+    experiment = pcvl.Experiment()
+    experiment.add(0, runtime.circuit.copy())
+    positions = {mode: idx for idx, mode in enumerate(runtime.active_modes)}
+    for global_mode, detector in runtime.detectors.items():
+        if detector is not None:
+            experiment.add(positions[global_mode], detector)
+    experiment.with_input(block._base_input_state)
+
+    return QuantumLayer(
+        experiment=experiment,
+        input_size=0,
+        n_photons=block.n_photons,
+        measurement_strategy=MeasurementStrategy.partial(
+            list(runtime.measured_modes),
+            ComputationSpace.FOCK,
+        ),
+    )
+
+
+def _global_key_from_partial_outcome(
+    block: FeedForwardBlock, outcome: tuple[int, ...]
+) -> tuple[int | None, ...]:
+    runtime = block._stage_runtimes[0]
+    full_key: list[int | None] = [None] * block.total_modes
+    for mode, value in zip(runtime.global_measured_modes, outcome, strict=True):
+        full_key[mode] = int(value)
+    return tuple(full_key)
+
+
+def _probabilities_from_partial_measurement_state_mixture_pipeline(
+    block: FeedForwardBlock,
+    *,
+    require_batched_multi_branch: bool = False,
+) -> dict[tuple[int, ...], float]:
+    runtime = block._stage_runtimes[0]
+    partial_layer = _first_stage_partial_measurement_layer(block)
+    partial = partial_layer()
+    if not isinstance(partial, PartialMeasurement):
+        raise AssertionError(
+            "Expected MeasurementStrategy.partial() to return PartialMeasurement."
+        )
+
+    grouped_branches: dict[
+        tuple[tuple[int | None, ...], tuple[int, ...], int],
+        list[StateMixtureBranch],
+    ] = defaultdict(list)
+    reconstructed: defaultdict[tuple[int, ...], float] = defaultdict(float)
+    for branch in partial.to_state_mixture():
+        outcome = branch.outcomes[-1] if branch.outcomes else ()
+        global_key = _global_key_from_partial_outcome(block, outcome)
+        remaining_n = branch.state.n_photons
+        if remaining_n == 0:
+            full_key = tuple(0 if value is None else int(value) for value in global_key)
+            probability = branch.probability
+            reconstructed[full_key] += float(
+                probability if probability.ndim == 0 else probability[0]
+            )
+            continue
+        grouped_branches[(global_key, outcome, remaining_n)].append(branch)
+
+    batched_multi_branch_groups = 0
+    for (global_key, outcome, remaining_n), branches in grouped_branches.items():
+        unmeasured_modes = tuple(
+            idx for idx, value in enumerate(global_key) if value is None
+        )
+        mixture = StateMixture(
+            branches=tuple(branches),
+            measured_modes=runtime.global_measured_modes,
+            unmeasured_modes=unmeasured_modes,
+        )
+        propagated = mixture
+        conditional_layer = block._select_conditional_layer(
+            runtime, outcome, remaining_n
+        )
+        if conditional_layer is not None:
+            expected_dim = len(
+                conditional_layer.computation_process.simulation_graph.mapped_keys
+            )
+            if mixture.branches[0].state.tensor.shape[-1] != expected_dim:
+                raise AssertionError(
+                    "PartialMeasurement StateMixture test cannot apply a "
+                    "conditional layer with a mismatched basis dimension."
+                )
+            restore = None
+            if require_batched_multi_branch and len(mixture) > 1:
+                batched_multi_branch_groups += 1
+                restore = conditional_layer._state_mixture_branch_outputs
+                conditional_layer._state_mixture_branch_outputs = (
+                    lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                        AssertionError(
+                            "PartialMeasurement StateMixture propagation "
+                            "used the sequential branch path."
+                        )
+                    )
+                )
+            try:
+                conditional_output = conditional_layer(mixture)
+            finally:
+                if restore is not None:
+                    conditional_layer._state_mixture_branch_outputs = restore
+            assert isinstance(conditional_output, StateMixture)
+            propagated = conditional_output
+
+        probability_layer = QuantumLayer(
+            input_size=0,
+            circuit=pcvl.Circuit(len(unmeasured_modes)),
+            input_state=[remaining_n, *([0] * (len(unmeasured_modes) - 1))],
+            n_photons=remaining_n,
+            measurement_strategy=MeasurementStrategy.probs(ComputationSpace.FOCK),
+        )
+        remaining_probabilities = probability_layer(propagated)
+        if remaining_probabilities.ndim == 1:
+            remaining_probabilities = remaining_probabilities.unsqueeze(0)
+        for basis_index, basis_state in enumerate(
+            _basis_states(len(unmeasured_modes), remaining_n)
+        ):
+            full_key = list(global_key)
+            for mode_idx, value in zip(unmeasured_modes, basis_state, strict=False):
+                full_key[mode_idx] = value
+            reconstructed[tuple(int(value) for value in full_key)] += float(
+                remaining_probabilities[0, basis_index]
+            )
+
+    if require_batched_multi_branch and batched_multi_branch_groups == 0:
+        raise AssertionError("Expected a compatible multi-branch StateMixture group.")
+    return dict(reconstructed)
+
+
 def test_feedforward_block_matches_perceval_distribution():
     experiment = _build_feedforward_experiment(pcvl.Detector.pnr())
     block = FeedForwardBlock(experiment)
@@ -426,3 +858,131 @@ def test_feedforward_block_matches_perceval_distribution():
         assert math.isclose(prob, perceval_probs[key], rel_tol=1e-5, abs_tol=1e-5), (
             f"Mismatch for key {key}: Merlin={prob}, Perceval={perceval_probs[key]}"
         )
+
+
+@pytest.mark.parametrize(
+    "detector_factory", [pcvl.Detector.pnr, pcvl.Detector.threshold]
+)
+def test_feedforward_block_state_mixture_recombination_matches_probability_path(
+    detector_factory,
+):
+    probability_block = FeedForwardBlock(
+        _build_feedforward_experiment(detector_factory())
+    )
+    state_mixture_block = FeedForwardBlock(
+        _build_feedforward_experiment(detector_factory())
+    )
+
+    probability_outputs = probability_block()
+
+    expected = _prune_probabilities(
+        _block_probabilities(probability_block, probability_outputs)
+    )
+    reconstructed = _prune_probabilities(
+        _probabilities_from_raw_feedforward_branches(state_mixture_block)
+    )
+
+    assert set(reconstructed) == set(expected)
+    for key, value in expected.items():
+        assert math.isclose(
+            value,
+            reconstructed[key],
+            rel_tol=1e-5,
+            abs_tol=1e-5,
+        ), (
+            f"Mismatch for key {key}: FeedForwardBlock={value}, StateMixture={reconstructed[key]}"
+        )
+
+
+def test_feedforward_block_state_mixture_operated_path_matches_probability_path():
+    probability_block = FeedForwardBlock(
+        _build_multi_threshold_feedforward_experiment()
+    )
+    state_mixture_block = FeedForwardBlock(
+        _build_multi_threshold_feedforward_experiment()
+    )
+
+    probability_outputs = probability_block()
+
+    expected = _prune_probabilities(
+        _block_probabilities(probability_block, probability_outputs)
+    )
+    reconstructed = _prune_probabilities(
+        _probabilities_from_state_mixture_feedforward_operations(
+            state_mixture_block,
+            require_batched_multi_branch=True,
+        )
+    )
+
+    assert set(reconstructed) == set(expected)
+    for key, value in expected.items():
+        assert math.isclose(
+            value,
+            reconstructed[key],
+            rel_tol=1e-5,
+            abs_tol=1e-5,
+        ), (
+            f"Mismatch for key {key}: FeedForwardBlock={value}, StateMixture-operated={reconstructed[key]}"
+        )
+
+
+def test_feedforward_partial_measurement_state_mixture_pipeline_matches_probability_path():
+    probability_block = FeedForwardBlock(
+        _build_multi_threshold_feedforward_experiment()
+    )
+    partial_block = FeedForwardBlock(_build_multi_threshold_feedforward_experiment())
+
+    probability_outputs = probability_block()
+
+    expected = _prune_probabilities(
+        _block_probabilities(probability_block, probability_outputs)
+    )
+    reconstructed = _prune_probabilities(
+        _probabilities_from_partial_measurement_state_mixture_pipeline(
+            partial_block,
+            require_batched_multi_branch=True,
+        )
+    )
+
+    assert set(reconstructed) == set(expected)
+    for key, value in expected.items():
+        assert math.isclose(
+            value,
+            reconstructed[key],
+            rel_tol=1e-5,
+            abs_tol=1e-5,
+        ), (
+            f"Mismatch for key {key}: FeedForwardBlock={value}, PartialMeasurement+StateMixture={reconstructed[key]}"
+        )
+
+
+def test_feedforward_state_mixture_batches_nontrivial_downstream_layer(monkeypatch):
+    block = FeedForwardBlock(_build_multi_threshold_feedforward_experiment())
+    mixture = _first_compatible_feedforward_mixture(block)
+    assert len(mixture) > 1
+    n_modes = mixture.branches[0].state.n_modes
+    n_photons = mixture.branches[0].state.n_photons
+
+    sequential_layer = _nontrivial_downstream_layer(n_modes, n_photons)
+    sequential_outputs = sequential_layer._state_mixture_branch_outputs(
+        tuple(mixture),
+        shots=None,
+        sampling_method=None,
+        simultaneous_processes=None,
+    )
+    expected = sequential_layer._weighted_state_mixture_tensor(
+        mixture, sequential_outputs
+    )
+
+    batched_layer = _nontrivial_downstream_layer(n_modes, n_photons)
+    monkeypatch.setattr(
+        batched_layer,
+        "_state_mixture_branch_outputs",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("StateMixture downstream propagation used sequential path.")
+        ),
+    )
+
+    output = batched_layer(mixture)
+
+    assert torch.allclose(output, expected, atol=1e-6, rtol=1e-6)

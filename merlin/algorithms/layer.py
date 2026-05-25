@@ -849,6 +849,17 @@ class QuantumLayer(MerlinModule):
         for branch in branches:
             self._validate_state_mixture_branch(branch)
 
+        kind = _resolve_measurement_kind(self.measurement_strategy)
+        if kind not in (MeasurementKind.AMPLITUDES, MeasurementKind.PARTIAL):
+            batched_tensor = self._batched_weighted_state_mixture_tensor(
+                branches,
+                shots=shots,
+                sampling_method=sampling_method,
+                simultaneous_processes=simultaneous_processes,
+            )
+            if batched_tensor is not None:
+                return batched_tensor
+
         branch_outputs = self._batched_state_mixture_branch_outputs(
             branches,
             shots=shots,
@@ -863,7 +874,6 @@ class QuantumLayer(MerlinModule):
                 simultaneous_processes=simultaneous_processes,
             )
 
-        kind = _resolve_measurement_kind(self.measurement_strategy)
         if kind == MeasurementKind.AMPLITUDES:
             return self._state_mixture_from_amplitude_outputs(mixture, branch_outputs)
         if kind == MeasurementKind.PARTIAL:
@@ -922,6 +932,30 @@ class QuantumLayer(MerlinModule):
             raise TypeError("StateMixture branch propagation cannot nest mixtures.")
         return self._split_state_mixture_batched_output(batched_output, branches)
 
+    def _batched_weighted_state_mixture_tensor(
+        self,
+        branches: tuple[StateMixtureBranch, ...],
+        *,
+        shots: int | None,
+        sampling_method: str | None,
+        simultaneous_processes: int | None,
+    ) -> torch.Tensor | None:
+        """Propagate compatible tensor-output branches and recombine them."""
+        batched_state = self._state_mixture_batched_input(branches)
+        if batched_state is None:
+            return None
+
+        batched_output = self.forward(
+            batched_state,
+            shots=shots,
+            sampling_method=sampling_method,
+            simultaneous_processes=simultaneous_processes,
+        )
+        if isinstance(batched_output, StateMixture):
+            raise TypeError("StateMixture branch propagation cannot nest mixtures.")
+        batched_tensor = self._tensor_from_branch_output(batched_output)
+        return self._weighted_batched_state_mixture_tensor(branches, batched_tensor)
+
     def _state_mixture_batched_input(
         self, branches: tuple[StateMixtureBranch, ...]
     ) -> StateVector | None:
@@ -971,9 +1005,22 @@ class QuantumLayer(MerlinModule):
     ]:
         """Split a flattened branch-batch output back into per-branch outputs."""
         if isinstance(output, ProbabilityDistribution):
-            return self._split_state_mixture_batched_tensor(output.tensor, branches)
+            branch_outputs: list[
+                torch.Tensor
+                | PartialMeasurement
+                | StateVector
+                | ProbabilityDistribution
+            ] = []
+            branch_outputs.extend(
+                self._split_state_mixture_batched_tensor(output.tensor, branches)
+            )
+            return branch_outputs
         if isinstance(output, torch.Tensor):
-            return self._split_state_mixture_batched_tensor(output, branches)
+            branch_outputs = []
+            branch_outputs.extend(
+                self._split_state_mixture_batched_tensor(output, branches)
+            )
+            return branch_outputs
         if isinstance(output, StateVector):
             tensors = self._split_state_mixture_batched_tensor(output.tensor, branches)
             return [
@@ -986,7 +1033,11 @@ class QuantumLayer(MerlinModule):
                 for tensor in tensors
             ]
         if isinstance(output, PartialMeasurement):
-            return self._split_state_mixture_batched_partial(output, branches)
+            branch_outputs = []
+            branch_outputs.extend(
+                self._split_state_mixture_batched_partial(output, branches)
+            )
+            return branch_outputs
         raise TypeError(
             "StateMixture batched propagation returned an unexpected output "
             f"type: {type(output).__name__}."
@@ -1176,6 +1227,63 @@ class QuantumLayer(MerlinModule):
             probability = self._reshape_branch_probability(branch.probability, tensor)
             weighted_outputs.append(probability * tensor)
         return torch.stack(weighted_outputs, dim=0).sum(dim=0)
+
+    def _weighted_batched_state_mixture_tensor(
+        self, branches: tuple[StateMixtureBranch, ...], tensor: torch.Tensor
+    ) -> torch.Tensor:
+        """Return weighted recombination from one flattened branch batch."""
+        batch_sizes = self._state_mixture_branch_batch_sizes(branches)
+        branch_batch_size = batch_sizes[0]
+        if any(batch_size != branch_batch_size for batch_size in batch_sizes):
+            raise ValueError(
+                "Batched StateMixture tensor recombination requires equal branch "
+                f"batch sizes; got {batch_sizes}."
+            )
+        expected = len(branches) * branch_batch_size
+        if tensor.ndim == 0 or tensor.shape[0] != expected:
+            raise ValueError(
+                "Batched StateMixture propagation returned an incompatible "
+                f"output shape {tuple(tensor.shape)}; expected first dimension "
+                f"{expected}."
+            )
+
+        branch_axis_tensor = tensor.reshape(
+            len(branches),
+            branch_batch_size,
+            *tensor.shape[1:],
+        )
+        probabilities = self._state_mixture_probability_matrix(
+            branches,
+            batch_size=branch_batch_size,
+            dtype=tensor.dtype,
+            device=tensor.device,
+        )
+        while probabilities.ndim < branch_axis_tensor.ndim:
+            probabilities = probabilities.unsqueeze(-1)
+        return (probabilities * branch_axis_tensor).sum(dim=0)
+
+    @staticmethod
+    def _state_mixture_probability_matrix(
+        branches: tuple[StateMixtureBranch, ...],
+        *,
+        batch_size: int,
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> torch.Tensor:
+        """Return branch probabilities with shape ``(n_branches, batch_size)``."""
+        rows: list[torch.Tensor] = []
+        for branch in branches:
+            probability = branch.probability
+            if probability.ndim == 0:
+                probability = probability.expand(batch_size)
+            elif tuple(probability.shape) != (batch_size,):
+                raise ValueError(
+                    "StateMixture branch probability has incompatible shape "
+                    f"{tuple(probability.shape)}; expected scalar or "
+                    f"({batch_size},)."
+                )
+            rows.append(probability.to(device=device, dtype=dtype))
+        return torch.stack(rows, dim=0)
 
     @staticmethod
     def _tensor_from_branch_output(

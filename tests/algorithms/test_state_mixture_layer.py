@@ -105,8 +105,27 @@ def _layer(strategy: ML.MeasurementStrategy) -> ML.QuantumLayer:
     )
 
 
+def _partial_from_mixture(mixture: StateMixture) -> PartialMeasurement:
+    return PartialMeasurement(
+        branches=tuple(
+            PartialMeasurementBranch(
+                outcome=branch.outcomes[-1],
+                probability=branch.probability,
+                amplitudes=branch.state,
+            )
+            for branch in mixture
+        ),
+        measured_modes=mixture.measured_modes,
+        unmeasured_modes=mixture.unmeasured_modes,
+    )
+
+
 def _fail_sequential_state_mixture_path(*_args, **_kwargs):
     raise AssertionError("StateMixture propagation unexpectedly used sequential path.")
+
+
+def _fail_batched_split_path(*_args, **_kwargs):
+    raise AssertionError("StateMixture propagation unexpectedly split batched output.")
 
 
 def _assert_state_mixtures_close(left: StateMixture, right: StateMixture) -> None:
@@ -150,25 +169,93 @@ def test_probability_output_batches_compatible_branches_and_matches_sequential(
     assert torch.allclose(output, expected)
 
 
+def test_probability_output_batches_and_recombines_without_split(monkeypatch):
+    mixture = _batched_three_branch_mixture()
+    layer = _layer(ML.MeasurementStrategy.probs(ML.ComputationSpace.FOCK))
+    sequential_branch_outputs = layer._state_mixture_branch_outputs(
+        tuple(mixture),
+        shots=None,
+        sampling_method=None,
+        simultaneous_processes=None,
+    )
+    expected = layer._weighted_state_mixture_tensor(mixture, sequential_branch_outputs)
+    monkeypatch.setattr(
+        layer,
+        "_state_mixture_branch_outputs",
+        _fail_sequential_state_mixture_path,
+    )
+    monkeypatch.setattr(
+        layer,
+        "_split_state_mixture_batched_output",
+        _fail_batched_split_path,
+    )
+
+    output = layer(mixture)
+
+    assert torch.allclose(output, expected)
+
+
 def test_probability_output_layer_accepts_partial_measurement_directly():
     mixture = _single_photon_mixture()
-    partial = PartialMeasurement(
-        branches=tuple(
-            PartialMeasurementBranch(
-                outcome=branch.outcomes[-1],
-                probability=branch.probability,
-                amplitudes=branch.state,
-            )
-            for branch in mixture
-        ),
-        measured_modes=mixture.measured_modes,
-        unmeasured_modes=mixture.unmeasured_modes,
-    )
+    partial = _partial_from_mixture(mixture)
     layer = _layer(ML.MeasurementStrategy.probs(ML.ComputationSpace.FOCK))
 
     output = layer(partial)
 
     assert torch.allclose(output, torch.tensor([[0.25, 0.75]]))
+
+
+def test_probability_output_batches_partial_measurement_without_split(monkeypatch):
+    mixture = _batched_three_branch_mixture()
+    partial = _partial_from_mixture(mixture)
+    layer = _layer(ML.MeasurementStrategy.probs(ML.ComputationSpace.FOCK))
+    sequential_branch_outputs = layer._state_mixture_branch_outputs(
+        tuple(mixture),
+        shots=None,
+        sampling_method=None,
+        simultaneous_processes=None,
+    )
+    expected = layer._weighted_state_mixture_tensor(mixture, sequential_branch_outputs)
+    monkeypatch.setattr(
+        layer,
+        "_state_mixture_branch_outputs",
+        _fail_sequential_state_mixture_path,
+    )
+    monkeypatch.setattr(
+        layer,
+        "_split_state_mixture_batched_output",
+        _fail_batched_split_path,
+    )
+
+    output = layer(partial)
+
+    assert torch.allclose(output, expected)
+
+
+def test_mode_expectation_output_batches_and_recombines_without_split(monkeypatch):
+    mixture = _batched_three_branch_mixture()
+    layer = _layer(ML.MeasurementStrategy.mode_expectations(ML.ComputationSpace.FOCK))
+    sequential_branch_outputs = layer._state_mixture_branch_outputs(
+        tuple(mixture),
+        shots=None,
+        sampling_method=None,
+        simultaneous_processes=None,
+    )
+    expected = layer._weighted_state_mixture_tensor(mixture, sequential_branch_outputs)
+    monkeypatch.setattr(
+        layer,
+        "_state_mixture_branch_outputs",
+        _fail_sequential_state_mixture_path,
+    )
+    monkeypatch.setattr(
+        layer,
+        "_split_state_mixture_batched_output",
+        _fail_batched_split_path,
+    )
+
+    output = layer(mixture)
+
+    assert torch.allclose(output, expected)
 
 
 def test_amplitude_output_layer_accepts_state_mixture_and_returns_mixture():

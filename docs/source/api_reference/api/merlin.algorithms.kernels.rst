@@ -21,6 +21,29 @@ merlin.algorithms.kernels module
    :undoc-members:
    :show-inheritance:
 
+Deprecations
+------------
+
+.. warning:: *Deprecated since version 0.3:*
+   The ``no_bunching`` flag accepted by legacy kernel constructors is removed
+   since version 0.3.0. Use the ``computation_space`` parameter instead.
+   See :doc:`/user_guide/migration_guide`.
+
+.. warning:: *Deprecated since version 0.4:*
+   Direct unitary construction through :meth:`FeatureMap.compute_unitary` is a
+   legacy path. It still owns compiler state for backwards compatibility, but
+   :class:`FidelityKernel` no longer uses it. Use :class:`FidelityKernel` for
+   kernel computations.
+
+.. note::
+
+   :class:`~merlin.algorithms.kernels.FeatureMap` is the descriptor used by
+   :class:`~merlin.algorithms.kernels.FidelityKernel`: it stores the circuit or
+   experiment, input size, parameter prefixes, dtype, and device.
+   :class:`~merlin.algorithms.kernels.FidelityKernel` uses the internal
+   ``CCInvQuantumLayer`` adapter, and ``CCInvQuantumLayer`` uses the
+   :class:`~merlin.algorithms.layer.QuantumLayer` backend.
+
 .. note::
 
    When the wrapped :class:`~merlin.algorithms.kernels.FeatureMap` exposes a
@@ -68,9 +91,10 @@ Custom experiment with FeatureMap
     import perceval as pcvl
     from merlin.algorithms.kernels import FeatureMap, FidelityKernel
 
-    # Define a photonic circuit
+    # Define a photonic circuit with two input parameters
     circuit = pcvl.Circuit(6)
-    # Add whatever to the circuit...
+    circuit.add(0, pcvl.PS(pcvl.P("x0")))
+    circuit.add(1, pcvl.PS(pcvl.P("x1")))
 
     # Define the Experiment
     experiment = pcvl.Experiment(circuit)
@@ -79,20 +103,21 @@ Custom experiment with FeatureMap
     experiment.detectors[0] = pcvl.Detector.threshold()
     experiment.detectors[5] = pcvl.Detector.ppnr(n_wires=3)
 
-    # Use the experiment to create a FeatureMap automatically
-    feature_map = FeatureMap.from_photonic_backend(
-        input_size=0,
+    # Use the experiment to create a FeatureMap
+    feature_map = FeatureMap(
         experiment=experiment,
+        input_size=2,
+        input_parameters="x",
     )
 
     # Build the kernel with a specific input state
     kernel = FidelityKernel(
         feature_map=feature_map,
         input_state=[2, 0, 2, 0, 2, 0],
-        computation_space=ComputationSpace.FOCK, 
+        computation_space=ComputationSpace.FOCK,
     )
 
-    X = torch.rand(8, 3)
+    X = torch.rand(8, 2)
     K = kernel(X)  # (8, 8)
 
 Use with scikit-learn (precomputed kernel)

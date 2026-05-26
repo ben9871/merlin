@@ -1,19 +1,19 @@
-"""Benchmark FeedForwardBlock against PartialMeasurement/StateMixture propagation.
+"""Benchmark representative StateMixture propagation through QuantumLayer.
 
-The primary benchmark compares the active FeedForwardBlock probability path with
-an equivalent path that runs the measured stage as
-``MeasurementStrategy.partial(...)``, converts the resulting
-``PartialMeasurement`` to ``StateMixture``, and propagates compatible branches
-through the next ``QuantumLayer``.
+The primary benchmark compares two ways to propagate the same conditional
+branches through a nontrivial downstream ``QuantumLayer``:
 
-The benchmark also keeps older diagnostic paths that reconstruct
-``StateMixture`` from raw FeedForwardBlock branches. Those paths are useful for
-sanity checks, but the PartialMeasurement path is the one that reflects the
-intended PML-315 API shape.
+* a sequential per-branch loop over ``StateVector`` inputs;
+* a batched ``StateMixture`` input that lets ``QuantumLayer`` fuse compatible
+  branches and recombine tensor outputs.
 
-It also benchmarks a more realistic downstream scenario: the same raw
-FeedForwardBlock branches are propagated through nontrivial circuits either one
-branch at a time or as compatible StateMixture batches.
+The feed-forward block is used only as a deterministic branch generator. Its
+specialized probability path is recorded as context, but it is not the primary
+baseline for the ``QuantumLayer`` batching decision.
+
+The benchmark also keeps identity-probability paths under a diagnostic section.
+Those paths validate recombination and basis expansion, but they intentionally
+measure a near-worst case where there is little layer work to amortize.
 
 Example:
 
@@ -307,7 +307,7 @@ def _state_mixture_probability_map(
     block: FeedForwardBlock,
     layer_cache: dict[tuple[int, int], QuantumLayer],
 ) -> dict[tuple[int, ...], torch.Tensor]:
-    """Recombine raw FeedForwardBlock branches through StateMixture."""
+    """Run the identity-probability diagnostic over StateMixture branches."""
     grouped_branches: dict[
         tuple[tuple[int | None, ...], int], list[StateMixtureBranch]
     ] = defaultdict(list)
@@ -438,7 +438,7 @@ def _partial_measurement_state_mixture_probability_map(
     partial_layer: QuantumLayer,
     probability_layer_cache: dict[tuple[int, int], QuantumLayer],
 ) -> dict[tuple[int, ...], torch.Tensor]:
-    """Run feed-forward through PartialMeasurement then StateMixture layers."""
+    """Run the identity-probability diagnostic from PartialMeasurement output."""
     if len(block._stage_runtimes) != 1:
         raise ValueError(
             "PartialMeasurement StateMixture feed-forward benchmark is one-stage."
@@ -535,7 +535,7 @@ def _state_mixture_operated_feedforward_probability_map(
     block: FeedForwardBlock,
     probability_layer_cache: dict[tuple[int, int], QuantumLayer],
 ) -> dict[tuple[int, ...], torch.Tensor]:
-    """Run one-stage feed-forward using StateMixture for conditional operations."""
+    """Run one-stage feed-forward diagnostics using StateMixture conditionals."""
     if len(block._stage_runtimes) != 1:
         raise ValueError("StateMixture-operated feed-forward benchmark is one-stage.")
     runtime = block._stage_runtimes[0]
@@ -748,7 +748,7 @@ def _batched_downstream_probability_map(
     *,
     depth: int,
 ) -> dict[tuple[int, ...], torch.Tensor]:
-    """Propagate compatible feed-forward branches as StateMixture batches."""
+    """Propagate only multi-branch groups as StateMixture batches."""
     grouped_branches: dict[
         tuple[tuple[int | None, ...], int], list[StateMixtureBranch]
     ] = defaultdict(list)
@@ -774,17 +774,27 @@ def _batched_downstream_probability_map(
         unmeasured_modes = [
             idx for idx, value in enumerate(measurement_key) if value is None
         ]
-        mixture = StateMixture(
-            branches=tuple(branches),
-            measured_modes=tuple(
-                idx for idx, value in enumerate(measurement_key) if value is not None
-            ),
-            unmeasured_modes=tuple(unmeasured_modes),
-        )
         layer = _downstream_probability_layer(
             layer_cache, len(unmeasured_modes), remaining_n, depth
         )
-        remaining_probabilities = layer(mixture)
+        if len(branches) == 1:
+            branch = branches[0]
+            branch_probabilities = layer(branch.state)
+            if branch_probabilities.ndim == 1:
+                branch_probabilities = branch_probabilities.unsqueeze(0)
+            probability = _batch_probability(branch.probability)
+            remaining_probabilities = probability.reshape(-1, 1) * branch_probabilities
+        else:
+            mixture = StateMixture(
+                branches=tuple(branches),
+                measured_modes=tuple(
+                    idx
+                    for idx, value in enumerate(measurement_key)
+                    if value is not None
+                ),
+                unmeasured_modes=tuple(unmeasured_modes),
+            )
+            remaining_probabilities = layer(mixture)
         _expand_remaining_probabilities(
             probabilities,
             measurement_key,
@@ -892,11 +902,14 @@ def _timed_variant(
     rss_before = _rss_max_kib()
     mean_s, times_s, output = _mean_timed_call(runs, warmups, callback)
     rss_after = _rss_max_kib()
+    tail_times_s = times_s[len(times_s) // 2 :]
     return (
         {
             "times_s": times_s,
             "mean_s": mean_s,
             "median_s": median(times_s),
+            "tail_mean_s": mean(tail_times_s),
+            "tail_median_s": median(tail_times_s),
             "min_s": min(times_s),
             "max_s": max(times_s),
             "rss_before_kib": rss_before,
@@ -923,8 +936,89 @@ def _output_summary(output: torch.Tensor) -> dict[str, Any]:
     }
 
 
-def _run_case(case: Case, runs: int, warmups: int) -> dict[str, Any]:
+def _run_case(
+    case: Case, runs: int, warmups: int, *, representative_only: bool
+) -> dict[str, Any]:
     """Run one benchmark case and return JSON-serializable data."""
+    branch_summary_block = FeedForwardBlock(_build_feedforward_experiment(case))
+    sequential_downstream_block = FeedForwardBlock(_build_feedforward_experiment(case))
+    batched_downstream_block = FeedForwardBlock(_build_feedforward_experiment(case))
+    sequential_downstream_cache: dict[tuple[int, int, int], QuantumLayer] = {}
+    batched_downstream_cache: dict[tuple[int, int, int], QuantumLayer] = {}
+
+    sequential_downstream_metrics, sequential_downstream_output = _timed_variant(
+        runs,
+        warmups,
+        lambda: _sequential_downstream_probability_map(
+            sequential_downstream_block,
+            sequential_downstream_cache,
+            depth=case.downstream_depth,
+        ),
+    )
+    if not isinstance(sequential_downstream_output, dict):
+        raise TypeError(
+            "Sequential downstream benchmark must return a probability map."
+        )
+    batched_downstream_metrics, batched_downstream_output = _timed_variant(
+        runs,
+        warmups,
+        lambda: _batched_downstream_probability_map(
+            batched_downstream_block,
+            batched_downstream_cache,
+            depth=case.downstream_depth,
+        ),
+    )
+    if not isinstance(batched_downstream_output, dict):
+        raise TypeError("Batched downstream benchmark must return a probability map.")
+
+    result: dict[str, Any] = {
+        **asdict(case),
+        "runs": runs,
+        "warmups": warmups,
+        "output_size": len(sequential_downstream_output),
+        "raw_branch_summary": _raw_branch_group_summary(branch_summary_block),
+        "representative_downstream_layer": {
+            "purpose": (
+                "Compare sequential per-branch StateVector propagation against "
+                "a conservative StateMixture batching policy through a "
+                "nontrivial downstream QuantumLayer."
+            ),
+            "batch_policy": (
+                "Use StateMixture only for grouped branches with at least two "
+                "compatible states; propagate singleton groups directly as "
+                "StateVector inputs."
+            ),
+            "downstream_depth": case.downstream_depth,
+            "sequential_branch_loop": sequential_downstream_metrics,
+            "batched_state_mixture": batched_downstream_metrics,
+            "batched_vs_sequential_speedup": (
+                sequential_downstream_metrics["mean_s"]
+                / batched_downstream_metrics["mean_s"]
+                if batched_downstream_metrics["mean_s"] > 0
+                else None
+            ),
+            "batched_vs_sequential_median_speedup": (
+                sequential_downstream_metrics["median_s"]
+                / batched_downstream_metrics["median_s"]
+                if batched_downstream_metrics["median_s"] > 0
+                else None
+            ),
+            "batched_vs_sequential_tail_speedup": (
+                sequential_downstream_metrics["tail_mean_s"]
+                / batched_downstream_metrics["tail_mean_s"]
+                if batched_downstream_metrics["tail_mean_s"] > 0
+                else None
+            ),
+            "batched_vs_sequential_max_abs_diff": _probability_map_max_abs_diff(
+                sequential_downstream_output,
+                batched_downstream_output,
+            ),
+            "output": _probability_map_summary(sequential_downstream_output),
+        },
+    }
+    if representative_only:
+        return result
+
     probability_block = FeedForwardBlock(_build_feedforward_experiment(case))
     partial_measurement_block = FeedForwardBlock(_build_feedforward_experiment(case))
     partial_measurement_layer = _first_stage_partial_measurement_layer(
@@ -935,10 +1029,6 @@ def _run_case(case: Case, runs: int, warmups: int) -> dict[str, Any]:
     identity_layer_cache: dict[tuple[int, int], QuantumLayer] = {}
     state_mixture_operated_block = FeedForwardBlock(_build_feedforward_experiment(case))
     state_mixture_operated_cache: dict[tuple[int, int], QuantumLayer] = {}
-    sequential_downstream_block = FeedForwardBlock(_build_feedforward_experiment(case))
-    batched_downstream_block = FeedForwardBlock(_build_feedforward_experiment(case))
-    sequential_downstream_cache: dict[tuple[int, int, int], QuantumLayer] = {}
-    batched_downstream_cache: dict[tuple[int, int, int], QuantumLayer] = {}
 
     direct_metrics, direct_output = _timed_variant(runs, warmups, probability_block)
     if not isinstance(direct_output, torch.Tensor):
@@ -982,38 +1072,16 @@ def _run_case(case: Case, runs: int, warmups: int) -> dict[str, Any]:
     if not isinstance(state_mixture_operated_output, torch.Tensor):
         raise TypeError("StateMixture-operated feed-forward must return a tensor.")
 
-    sequential_downstream_metrics, sequential_downstream_output = _timed_variant(
-        runs,
-        warmups,
-        lambda: _sequential_downstream_probability_map(
-            sequential_downstream_block,
-            sequential_downstream_cache,
-            depth=case.downstream_depth,
+    result["feedforward_probability_context"] = {
+        "metrics": direct_metrics,
+        "output": _output_summary(direct_output),
+    }
+    result["diagnostic_identity_recombination"] = {
+        "purpose": (
+            "Validate StateMixture recombination and basis expansion with an "
+            "identity probability layer. This is not the representative "
+            "QuantumLayer batching benchmark."
         ),
-    )
-    if not isinstance(sequential_downstream_output, dict):
-        raise TypeError(
-            "Sequential downstream benchmark must return a probability map."
-        )
-    batched_downstream_metrics, batched_downstream_output = _timed_variant(
-        runs,
-        warmups,
-        lambda: _batched_downstream_probability_map(
-            batched_downstream_block,
-            batched_downstream_cache,
-            depth=case.downstream_depth,
-        ),
-    )
-    if not isinstance(batched_downstream_output, dict):
-        raise TypeError("Batched downstream benchmark must return a probability map.")
-
-    return {
-        **asdict(case),
-        "runs": runs,
-        "warmups": warmups,
-        "output_size": len(output_keys),
-        "raw_branch_summary": _raw_branch_group_summary(state_mixture_block),
-        "feedforward_probability": direct_metrics,
         "partial_measurement_state_mixture": partial_measurement_metrics,
         "partial_measurement_state_mixture_vs_feedforward_speedup": (
             direct_metrics["mean_s"] / partial_measurement_metrics["mean_s"]
@@ -1042,23 +1110,8 @@ def _run_case(case: Case, runs: int, warmups: int) -> dict[str, Any]:
             direct_output,
             state_mixture_operated_output,
         ),
-        "output": _output_summary(direct_output),
-        "downstream_nontrivial": {
-            "sequential_branch_loop": sequential_downstream_metrics,
-            "batched_state_mixture": batched_downstream_metrics,
-            "batched_vs_sequential_speedup": (
-                sequential_downstream_metrics["mean_s"]
-                / batched_downstream_metrics["mean_s"]
-                if batched_downstream_metrics["mean_s"] > 0
-                else None
-            ),
-            "batched_vs_sequential_max_abs_diff": _probability_map_max_abs_diff(
-                sequential_downstream_output,
-                batched_downstream_output,
-            ),
-            "output": _probability_map_summary(sequential_downstream_output),
-        },
     }
+    return result
 
 
 def parse_args() -> argparse.Namespace:
@@ -1075,6 +1128,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--warmups", type=int, default=1)
+    parser.add_argument(
+        "--representative-only",
+        action="store_true",
+        help="Skip identity diagnostics and run only the nontrivial downstream benchmark.",
+    )
     parser.add_argument(
         "--case",
         action="append",
@@ -1107,7 +1165,16 @@ def main() -> int:
         "platform": platform.platform(),
         "torch": torch.__version__,
         "pid": os.getpid(),
-        "cases": [_run_case(case, args.runs, args.warmups) for case in cases],
+        "representative_only": bool(args.representative_only),
+        "cases": [
+            _run_case(
+                case,
+                args.runs,
+                args.warmups,
+                representative_only=bool(args.representative_only),
+            )
+            for case in cases
+        ],
     }
     text = json.dumps(payload, indent=2, sort_keys=True)
     print(text)

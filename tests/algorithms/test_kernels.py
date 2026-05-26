@@ -56,10 +56,12 @@ class TestCCInvBackend:
 
     def test_kernel_unitary_is_identity_when_x1_eq_x2(self):
         """U(x) @ U†(x) must be the identity."""
-        identity = torch.eye(
-            len(self.input_state), dtype=torch.complex64
-        )
-        for x in [torch.tensor([0.1, 0.4]), torch.tensor([1.2, 0.0]), torch.tensor([0.0, 0.0])]:
+        identity = torch.eye(len(self.input_state), dtype=torch.complex64)
+        for x in [
+            torch.tensor([0.1, 0.4]),
+            torch.tensor([1.2, 0.0]),
+            torch.tensor([0.0, 0.0]),
+        ]:
             K_unitary = self.layer._compute_kernel_unitary(
                 x.to(self.layer.dtype),
                 x.to(self.layer.dtype),
@@ -75,9 +77,7 @@ class TestCCInvBackend:
         loss = K.sum()
         loss.backward()
         for name, param in self.kernel.named_parameters():
-            assert param.grad is not None, (
-                f"No gradient for parameter '{name}'"
-            )
+            assert param.grad is not None, f"No gradient for parameter '{name}'"
 
     def test_k_train_is_symmetric(self):
         """Training kernel matrix must be symmetric."""
@@ -95,9 +95,7 @@ class TestCCInvBackend:
             dtype=torch.float32,
         )
         K = self.kernel(X)
-        assert torch.allclose(
-            torch.diag(K), torch.ones(3, dtype=K.dtype), atol=1e-4
-        )
+        assert torch.allclose(torch.diag(K), torch.ones(3, dtype=K.dtype), atol=1e-4)
 
     def test_new_backend_transition_prob_matches_perceval_slos(self):
         """Transition probability from the new backend must match Perceval SLOS.
@@ -473,7 +471,9 @@ class TestFidelityKernel:
         warning_message = str(warning_record[0].message)
         assert "CircuitBuilder.add_angle_encoding" in warning_message
         assert "pre-encoding the data" in warning_message
-        assert "input_size equal to the encoded circuit-parameter count" in warning_message
+        assert (
+            "input_size equal to the encoded circuit-parameter count" in warning_message
+        )
 
         encoded = kernel._quantum_layer._encode_single(torch.tensor([0.2, 0.3]))
         expected = torch.tensor([0.2, 0.3, 0.5], dtype=encoded.dtype)
@@ -502,7 +502,9 @@ class TestFidelityKernel:
         warning_message = str(warning_record[0].message)
         assert "CircuitBuilder.add_angle_encoding" in warning_message
         assert "pre-encoding the data" in warning_message
-        assert "input_size equal to the encoded circuit-parameter count" in warning_message
+        assert (
+            "input_size equal to the encoded circuit-parameter count" in warning_message
+        )
 
         encoded = kernel._quantum_layer._encode_single(torch.tensor([0.2, 0.3]))
         expected = torch.tensor([0.2, 0.3, 0.5], dtype=encoded.dtype)

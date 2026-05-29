@@ -1,0 +1,6 @@
+batch_size,blackbox_cuda_memory_peak_allocated_bytes,blackbox_rss_peak_bytes,blackbox_rss_peak_delta_bytes,blackbox_tracemalloc_peak_bytes,chunk_len,device,entangling_layers,input_grad_norm_sum_abs_delta,k,layer_output_call_ratio_blackbox_over_manual,manual_cuda_memory_peak_allocated_bytes,manual_rss_peak_bytes,manual_rss_peak_delta_bytes,manual_tracemalloc_peak_bytes,memristor_count,n_modes,n_photons,output_checksum_abs_delta,process_call_ratio_blackbox_over_manual,seconds_ratio_blackbox_over_manual,timesteps
+16,18327552,1316761600,4096,129289,2,cuda,2,0.0,2,1.5,18004992,1316761600,12288,109701,2,8,3,6.357829533953918e-07,1.5,1.220959518517998,64
+16,19670016,1332621312,102400,201256,4,cuda,2,0.0,4,1.75,18671616,1332621312,0,144473,2,8,3,1.9073486328125e-06,1.75,1.6175950575669191,64
+16,22354944,1363480576,196608,343378,8,cuda,2,0.0,8,1.875,20004864,1363480576,0,218899,2,8,3,6.357829533953918e-07,1.875,1.8387091398841136,64
+16,27724800,1425821696,106496,630709,16,cuda,2,0.0,16,1.9375,22671360,1425821696,0,358738,2,8,3,6.357827260217164e-07,1.9375,1.921899371141306,64
+16,38464512,1549524992,8159232,1190995,32,cuda,2,0.0,32,1.96875,28004352,1549524992,0,640078,2,8,3,1.2715659067907836e-06,1.96875,2.0087319925505955,64

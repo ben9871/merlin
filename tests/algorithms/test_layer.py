@@ -2554,6 +2554,71 @@ def _make_memristive_layer(num_backprop_steps: int) -> ML.QuantumLayer:
     )
 
 
+def _make_two_memristor_layer(num_backprop_steps: int | None) -> ML.QuantumLayer:
+    """Build a small layer with two recurrent memristive phase shifters."""
+
+    def update_from_first_probability(
+        state: torch.Tensor, output: torch.Tensor
+    ) -> torch.Tensor:
+        return 0.85 * state + 0.15 * output[:, 0]
+
+    def update_from_second_probability(
+        state: torch.Tensor, output: torch.Tensor
+    ) -> torch.Tensor:
+        return 0.85 * state + 0.15 * output[:, 1]
+
+    builder = ML.CircuitBuilder(n_modes=4)
+    builder.add_entangling_layer(trainable=True, name="U1")
+    builder.add_memristive_ps(
+        mode=0,
+        update_rule=update_from_first_probability,
+        initial_state=0.25,
+        name="mem0",
+        num_backprop_steps=num_backprop_steps,
+    )
+    builder.add_memristive_ps(
+        mode=1,
+        update_rule=update_from_second_probability,
+        initial_state=0.35,
+        name="mem1",
+        num_backprop_steps=num_backprop_steps,
+    )
+    builder.add_entangling_layer(trainable=True, name="U2")
+    builder.add_angle_encoding(modes=[2, 3], name="input")
+
+    return ML.QuantumLayer(
+        builder=builder,
+        input_size=2,
+        input_state=[1, 1, 0, 0],
+        measurement_strategy=ML.MeasurementStrategy.probs(
+            computation_space=ML.ComputationSpace.FOCK
+        ),
+    )
+
+
+def _run_chunked_memristor_sequence(
+    layer: ML.QuantumLayer, inputs: list[torch.Tensor], chunk_len: int
+) -> tuple[float, list[float]]:
+    """Run a chunked sequence and detach memristive state after each backward."""
+    output_checksum = 0.0
+    loss_terms = []
+    for index, input_batch in enumerate(inputs):
+        output = layer(input_batch)
+        output_checksum += output.detach().sum().item()
+        loss_terms.append(output[:, 0].mean())
+        if (index + 1) % chunk_len == 0 or index + 1 == len(inputs):
+            loss = torch.stack(loss_terms).sum()
+            loss.backward()
+            layer.detach_memristive_state()
+            loss_terms = []
+
+    grad_norms = [
+        0.0 if input_batch.grad is None else input_batch.grad.abs().max().item()
+        for input_batch in inputs
+    ]
+    return output_checksum, grad_norms
+
+
 def test_zero_backprop_steps_blocks_later_loss_from_earlier_inputs():
     """num_backprop_steps=0 should make the memristor reservoir-like.
 
@@ -2583,12 +2648,68 @@ def test_zero_backprop_steps_blocks_later_loss_from_earlier_inputs():
     assert past_grad_norms == pytest.approx([0.0, 0.0, 0.0], abs=1e-8)
 
 
-def test_num_backprop_steps_2_maintains_sliding_window():
-    """num_backprop_steps=2 should allow gradients through the last 3 states.
+def test_detach_memristive_state_preserves_multiple_memristor_values():
+    """Manual TBPTT detaches recurrent graph without resetting memristor values."""
+    torch.manual_seed(11)
+    layer = _make_two_memristor_layer(num_backprop_steps=None)
+    layer.reset(batch_size=2)
 
-    With num_backprop_steps=2, the window size is 3. This means that:
-    - Forward passes 1-3: all gradients flow freely
-    - Forward passes 4+: gradients only flow through the last 3 forwards
+    input_batch = torch.randn(2, 2, requires_grad=True)
+    output = layer(input_batch)
+    loss = output[:, 0].sum()
+    loss.backward()
+
+    state_before = [state.detach().clone() for state in layer.memristive_state]
+    history_lengths_before = [len(history) for history in layer.memristive_history]
+
+    layer.detach_memristive_state()
+
+    assert len(layer.memristive_state) == 2
+    assert [len(history) for history in layer.memristive_history] == history_lengths_before
+    for state, expected in zip(layer.memristive_state, state_before, strict=True):
+        assert torch.allclose(state, expected)
+        assert not state.requires_grad
+    assert layer.computation_process.converter.memristive_current_state is layer.memristive_state
+
+
+def test_two_memristor_blackbox_window_matches_manual_tbptt_loop():
+    """Blackbox k-step and manual full-history detach agree for two memristors."""
+    torch.manual_seed(12)
+    blackbox_layer = _make_two_memristor_layer(num_backprop_steps=2)
+    blackbox_layer.reset(batch_size=1)
+    torch.manual_seed(12)
+    manual_layer = _make_two_memristor_layer(num_backprop_steps=None)
+    manual_layer.reset(batch_size=1)
+
+    generator = torch.Generator().manual_seed(120)
+    base_inputs = [torch.randn(1, 2, generator=generator) for _ in range(4)]
+    blackbox_inputs = [
+        input_batch.clone().detach().requires_grad_(True) for input_batch in base_inputs
+    ]
+    manual_inputs = [
+        input_batch.clone().detach().requires_grad_(True) for input_batch in base_inputs
+    ]
+
+    blackbox_checksum, blackbox_grad_norms = _run_chunked_memristor_sequence(
+        blackbox_layer, blackbox_inputs, chunk_len=2
+    )
+    manual_checksum, manual_grad_norms = _run_chunked_memristor_sequence(
+        manual_layer, manual_inputs, chunk_len=2
+    )
+
+    assert blackbox_checksum == pytest.approx(manual_checksum, abs=1e-7)
+    assert blackbox_grad_norms == pytest.approx(manual_grad_norms, abs=1e-6)
+    assert [len(history) for history in blackbox_layer.memristive_history] == [5, 5]
+    assert [len(history) for history in manual_layer.memristive_history] == [5, 5]
+
+
+def test_num_backprop_steps_2_maintains_sliding_window():
+    """num_backprop_steps=2 should allow gradients through the last 2 forwards.
+
+    In the current benchmark branch contract, ``num_backprop_steps`` is the
+    total differentiable forward window retained by the blackbox memristor
+    implementation. With ``num_backprop_steps=2``, a loss on the final output
+    should reach the current forward and the previous forward, then stop.
 
     This test verifies:
     1. Multiple forward passes accumulate memristive history
@@ -2606,7 +2727,6 @@ def test_num_backprop_steps_2_maintains_sliding_window():
 
     # Verify memristive history and gradient state tracking
     # After 5 forwards: history should have 6 entries (initial + 5 new)
-    # _memristive_gradient_states should have 3 entries (window_size = num_backprop_steps + 1)
     assert (
         len(layer.memristive_history[0]) == 6
     ), f"Expected 6 history entries, got {len(layer.memristive_history[0])}"
@@ -2615,24 +2735,19 @@ def test_num_backprop_steps_2_maintains_sliding_window():
     loss = outputs[-1][:, 0].sum()
     loss.backward()
 
-    # With num_backprop_steps=2 (window=3), only the last 3 forwards should get gradients
-    # That's inputs[2], inputs[3], inputs[4]
+    # With num_backprop_steps=2, only the last 2 forwards should get gradients.
+    # That's inputs[3] and inputs[4].
     grad_norms = [
         0.0 if input_batch.grad is None else input_batch.grad.abs().max().item()
         for input_batch in inputs
     ]
 
-    print(grad_norms)
-
-    # First two inputs (outside window) should have zero gradients
+    # First three inputs (outside window) should have zero gradients
     assert grad_norms[0] < 1e-8, f"Input 0 should have ~0 gradient, got {grad_norms[0]}"
     assert grad_norms[1] < 1e-8, f"Input 1 should have ~0 gradient, got {grad_norms[1]}"
+    assert grad_norms[2] < 1e-8, f"Input 2 should have ~0 gradient, got {grad_norms[2]}"
 
-    # Last three inputs (inside window) should have non-zero gradients
-    # Note: input[2] might have very small gradient (at the boundary), but should be non-zero
-    assert (
-        grad_norms[2] > 1e-10
-    ), f"Input 2 should have non-zero gradient, got {grad_norms[2]}"
+    # Last two inputs (inside window) should have non-zero gradients
     assert (
         grad_norms[3] > 1e-8
     ), f"Input 3 should have significant gradient, got {grad_norms[3]}"

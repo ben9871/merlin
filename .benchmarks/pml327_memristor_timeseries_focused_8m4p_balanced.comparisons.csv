@@ -1,0 +1,3 @@
+batch_size,blackbox_final_validation_loss,blackbox_seconds_mean,chunk_len,epochs,k,manual_final_validation_loss,manual_seconds_mean,memristor_count,n_batches,n_modes,n_photons,process_call_ratio_blackbox_over_manual,seconds_ratio_blackbox_over_manual,timesteps,val_batches,validation_loss_delta_blackbox_minus_manual
+8,0.7975208916597897,21.206702533372056,2,4,2,0.7975208916597897,15.40554079999371,1,3,8,4,1.375,1.3765633293042665,12,1,0.0
+8,0.7975208312273026,20.158156833378598,4,4,4,0.7975208291576968,14.08039176669748,1,3,8,4,1.5625,1.431647440453757,12,1,2.0696057090319186e-09

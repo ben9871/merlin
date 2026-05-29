@@ -1,0 +1,5 @@
+api,batch_size,chunk_len,entangling_layers,input_grad_norm_sum_mean,k,layer_output_calls_mean,memristor_count,n_modes,n_photons,output_checksum_mean,process_calls_total_mean,retained_gradient_outputs_max,rss_end_delta_bytes_max,rss_peak_bytes_max,rss_peak_delta_bytes_max,seconds_mean,seconds_min,timesteps,tracemalloc_peak_bytes_max
+blackbox,1,2,2,0.0,2,6,1,4,2,3.9999952912330627,6,0,6111232,374263808,6107136,0.04123139998409897,0.04123139998409897,4,26716
+blackbox,1,2,2,0.0,2,6,2,4,2,3.999995172023773,6,0,-8192,374435840,0,0.04029559995979071,0.04029559995979071,4,26561
+manual,1,2,2,0.0,2,4,1,4,2,3.9999952912330627,4,0,28672,374427648,28672,0.030620200093835592,0.030620200093835592,4,21254
+manual,1,2,2,0.0,2,4,2,4,2,3.999995172023773,4,0,0,374439936,0,0.02960700006224215,0.02960700006224215,4,19098

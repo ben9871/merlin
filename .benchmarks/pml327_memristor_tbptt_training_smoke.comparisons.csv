@@ -1,0 +1,2 @@
+batch_size,blackbox_final_epoch_loss,blackbox_rss_peak_delta_bytes,blackbox_seconds_mean,blackbox_tracemalloc_peak_bytes,chunk_len,entangling_layers,epochs,final_epoch_loss_abs_delta,k,manual_final_epoch_loss,manual_rss_peak_delta_bytes,manual_seconds_mean,manual_tracemalloc_peak_bytes,memristor_count,n_batches,n_modes,n_photons,process_call_ratio_blackbox_over_manual,seconds_ratio_blackbox_over_manual,timesteps
+2,0.03173356782644987,1925120,0.2055974000832066,45156,2,2,2,0.0,2,0.03173356782644987,20480,0.16586260008625686,31681,1,2,4,2,1.5,1.2395645550973253,4

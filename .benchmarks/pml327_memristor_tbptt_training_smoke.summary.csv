@@ -1,0 +1,3 @@
+api,batch_size,chunk_len,entangling_layers,epochs,final_epoch_loss_mean,first_chunk_loss_mean,k,last_chunk_loss_mean,layer_output_calls_mean,memristor_count,n_batches,n_modes,n_photons,optimizer_steps_mean,process_calls_total_mean,rss_peak_delta_bytes_max,seconds_mean,seconds_min,timesteps,tracemalloc_peak_bytes_max,trainable_parameter_count
+blackbox,2,2,2,2,0.03173356782644987,0.08971872925758362,2,0.023090437054634094,24,1,2,4,2,4,24,1925120,0.2055974000832066,0.2055974000832066,4,45156,121
+manual,2,2,2,2,0.03173356782644987,0.08971872925758362,2,0.023090437054634094,16,1,2,4,2,4,16,20480,0.16586260008625686,0.16586260008625686,4,31681,121

@@ -1,0 +1,315 @@
+{
+  "summary": [
+    {
+      "api": "blackbox",
+      "k": 2,
+      "chunk_len": 2,
+      "timesteps": 16,
+      "batch_size": 8,
+      "n_modes": 4,
+      "n_photons": 2,
+      "seconds_mean": 0.2470110000576824,
+      "seconds_min": 0.2470110000576824,
+      "layer_output_calls_mean": 24,
+      "process_calls_total_mean": 24,
+      "rss_peak_bytes_max": 374149120,
+      "tracemalloc_peak_bytes_max": 35270,
+      "retained_gradient_outputs_max": 0,
+      "output_checksum_mean": 127.9998049736023,
+      "input_grad_norm_sum_mean": 0.44399590604007244
+    },
+    {
+      "api": "manual",
+      "k": 2,
+      "chunk_len": 2,
+      "timesteps": 16,
+      "batch_size": 8,
+      "n_modes": 4,
+      "n_photons": 2,
+      "seconds_mean": 0.13609689997974783,
+      "seconds_min": 0.13609689997974783,
+      "layer_output_calls_mean": 16,
+      "process_calls_total_mean": 16,
+      "rss_peak_bytes_max": 374317056,
+      "tracemalloc_peak_bytes_max": 24720,
+      "retained_gradient_outputs_max": 0,
+      "output_checksum_mean": 127.9998049736023,
+      "input_grad_norm_sum_mean": 0.44399590604007244
+    },
+    {
+      "api": "blackbox",
+      "k": 4,
+      "chunk_len": 4,
+      "timesteps": 16,
+      "batch_size": 8,
+      "n_modes": 4,
+      "n_photons": 2,
+      "seconds_mean": 0.21252790000289679,
+      "seconds_min": 0.21252790000289679,
+      "layer_output_calls_mean": 28,
+      "process_calls_total_mean": 28,
+      "rss_peak_bytes_max": 378941440,
+      "tracemalloc_peak_bytes_max": 50311,
+      "retained_gradient_outputs_max": 0,
+      "output_checksum_mean": 127.9998049736023,
+      "input_grad_norm_sum_mean": 0.4446419682353735
+    },
+    {
+      "api": "manual",
+      "k": 4,
+      "chunk_len": 4,
+      "timesteps": 16,
+      "batch_size": 8,
+      "n_modes": 4,
+      "n_photons": 2,
+      "seconds_mean": 0.12777480005752295,
+      "seconds_min": 0.12777480005752295,
+      "layer_output_calls_mean": 16,
+      "process_calls_total_mean": 16,
+      "rss_peak_bytes_max": 378949632,
+      "tracemalloc_peak_bytes_max": 33447,
+      "retained_gradient_outputs_max": 0,
+      "output_checksum_mean": 127.9998049736023,
+      "input_grad_norm_sum_mean": 0.4446346159093082
+    }
+  ],
+  "comparisons": [
+    {
+      "k": 2,
+      "chunk_len": 2,
+      "timesteps": 16,
+      "batch_size": 8,
+      "n_modes": 4,
+      "n_photons": 2,
+      "seconds_ratio_blackbox_over_manual": 1.8149641916490336,
+      "layer_output_call_ratio_blackbox_over_manual": 1.5,
+      "process_call_ratio_blackbox_over_manual": 1.5,
+      "output_checksum_abs_delta": 0.0,
+      "input_grad_norm_sum_abs_delta": 0.0,
+      "blackbox_rss_peak_bytes": 374149120,
+      "manual_rss_peak_bytes": 374317056,
+      "blackbox_tracemalloc_peak_bytes": 35270,
+      "manual_tracemalloc_peak_bytes": 24720
+    },
+    {
+      "k": 4,
+      "chunk_len": 4,
+      "timesteps": 16,
+      "batch_size": 8,
+      "n_modes": 4,
+      "n_photons": 2,
+      "seconds_ratio_blackbox_over_manual": 1.6633005874962734,
+      "layer_output_call_ratio_blackbox_over_manual": 1.75,
+      "process_call_ratio_blackbox_over_manual": 1.75,
+      "output_checksum_abs_delta": 0.0,
+      "input_grad_norm_sum_abs_delta": 7.352326065301895e-06,
+      "blackbox_rss_peak_bytes": 378941440,
+      "manual_rss_peak_bytes": 378949632,
+      "blackbox_tracemalloc_peak_bytes": 50311,
+      "manual_tracemalloc_peak_bytes": 33447
+    }
+  ],
+  "runs": [
+    {
+      "api": "blackbox",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "batch_size": 8,
+        "timesteps": 16,
+        "k": 2,
+        "chunk_len": 2,
+        "seed": 1234
+      },
+      "seconds": 0.2470110000576824,
+      "layer_output_calls": 24,
+      "process_calls": {
+        "compute": 24,
+        "compute_superposition_state": 0,
+        "compute_ebs_simultaneously": 0
+      },
+      "process_calls_total": 24,
+      "rss_start_bytes": 368148480,
+      "rss_peak_bytes": 374149120,
+      "rss_end_bytes": 374153216,
+      "tracemalloc_peak_bytes": 35270,
+      "retained_gradient_outputs": 0,
+      "history_lengths": [
+        17
+      ],
+      "output_checksum": 127.9998049736023,
+      "input_grad_norm_sum": 0.44399590604007244,
+      "input_grad_norms": [
+        0.026908647269010544,
+        0.027359530329704285,
+        0.03131665289402008,
+        0.032694920897483826,
+        0.006515661254525185,
+        0.03250328078866005,
+        0.032496485859155655,
+        0.03098543919622898,
+        0.033359091728925705,
+        0.03414776921272278,
+        0.026210926473140717,
+        0.023267075419425964,
+        0.02671523205935955,
+        0.026068493723869324,
+        0.02920248731970787,
+        0.024244211614131927
+      ]
+    },
+    {
+      "api": "manual",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "batch_size": 8,
+        "timesteps": 16,
+        "k": 2,
+        "chunk_len": 2,
+        "seed": 1234
+      },
+      "seconds": 0.13609689997974783,
+      "layer_output_calls": 16,
+      "process_calls": {
+        "compute": 16,
+        "compute_superposition_state": 0,
+        "compute_ebs_simultaneously": 0
+      },
+      "process_calls_total": 16,
+      "rss_start_bytes": 374272000,
+      "rss_peak_bytes": 374317056,
+      "rss_end_bytes": 374317056,
+      "tracemalloc_peak_bytes": 24720,
+      "retained_gradient_outputs": 0,
+      "history_lengths": [
+        17
+      ],
+      "output_checksum": 127.9998049736023,
+      "input_grad_norm_sum": 0.44399590604007244,
+      "input_grad_norms": [
+        0.026908647269010544,
+        0.027359530329704285,
+        0.03131665289402008,
+        0.032694920897483826,
+        0.006515661254525185,
+        0.03250328078866005,
+        0.032496485859155655,
+        0.03098543919622898,
+        0.033359091728925705,
+        0.03414776921272278,
+        0.026210926473140717,
+        0.023267075419425964,
+        0.02671523205935955,
+        0.026068493723869324,
+        0.02920248731970787,
+        0.024244211614131927
+      ]
+    },
+    {
+      "api": "blackbox",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "batch_size": 8,
+        "timesteps": 16,
+        "k": 4,
+        "chunk_len": 4,
+        "seed": 1234
+      },
+      "seconds": 0.21252790000289679,
+      "layer_output_calls": 28,
+      "process_calls": {
+        "compute": 28,
+        "compute_superposition_state": 0,
+        "compute_ebs_simultaneously": 0
+      },
+      "process_calls_total": 28,
+      "rss_start_bytes": 374325248,
+      "rss_peak_bytes": 378941440,
+      "rss_end_bytes": 378941440,
+      "tracemalloc_peak_bytes": 50311,
+      "retained_gradient_outputs": 0,
+      "history_lengths": [
+        17
+      ],
+      "output_checksum": 127.9998049736023,
+      "input_grad_norm_sum": 0.4446419682353735,
+      "input_grad_norms": [
+        0.026967717334628105,
+        0.027550851926207542,
+        0.031316645443439484,
+        0.032694920897483826,
+        0.006652897223830223,
+        0.032557468861341476,
+        0.032496482133865356,
+        0.03098543919622898,
+        0.032898373901844025,
+        0.03444018214941025,
+        0.02621091529726982,
+        0.023267075419425964,
+        0.027025096118450165,
+        0.026131201535463333,
+        0.02920248918235302,
+        0.024244211614131927
+      ]
+    },
+    {
+      "api": "manual",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "batch_size": 8,
+        "timesteps": 16,
+        "k": 4,
+        "chunk_len": 4,
+        "seed": 1234
+      },
+      "seconds": 0.12777480005752295,
+      "layer_output_calls": 16,
+      "process_calls": {
+        "compute": 16,
+        "compute_superposition_state": 0,
+        "compute_ebs_simultaneously": 0
+      },
+      "process_calls_total": 16,
+      "rss_start_bytes": 378945536,
+      "rss_peak_bytes": 378949632,
+      "rss_end_bytes": 378945536,
+      "tracemalloc_peak_bytes": 33447,
+      "retained_gradient_outputs": 0,
+      "history_lengths": [
+        17
+      ],
+      "output_checksum": 127.9998049736023,
+      "input_grad_norm_sum": 0.4446346159093082,
+      "input_grad_norms": [
+        0.026967670768499374,
+        0.027551108971238136,
+        0.03131665289402008,
+        0.032694920897483826,
+        0.0066519915126264095,
+        0.032556504011154175,
+        0.032496485859155655,
+        0.03098543919622898,
+        0.0328984297811985,
+        0.0344371497631073,
+        0.026210926473140717,
+        0.023267075419425964,
+        0.027022991329431534,
+        0.026130570098757744,
+        0.02920248731970787,
+        0.024244211614131927
+      ]
+    }
+  ],
+  "notes": {
+    "blackbox": "num_backprop_steps=k, automatic bounded memristive window",
+    "manual": "num_backprop_steps=None, user calls detach_memristive_state() at chunk boundaries",
+    "rss": "RSS requires optional psutil; tracemalloc captures Python allocations, not all PyTorch native allocations."
+  }
+}

@@ -1,0 +1,194 @@
+{
+  "summary": [
+    {
+      "api": "blackbox",
+      "k": 1,
+      "chunk_len": 1,
+      "timesteps": 2,
+      "batch_size": 1,
+      "n_modes": 3,
+      "n_photons": 1,
+      "memristor_count": 1,
+      "entangling_layers": 1,
+      "device": "cuda",
+      "seconds_mean": 0.24565179300043383,
+      "seconds_min": 0.24565179300043383,
+      "layer_output_calls_mean": 2,
+      "process_calls_total_mean": 2,
+      "rss_peak_bytes_max": 1273901056,
+      "rss_peak_delta_bytes_max": 368660480,
+      "rss_end_delta_bytes_max": 368717824,
+      "tracemalloc_peak_bytes_max": 71073,
+      "cuda_memory_peak_allocated_bytes_max": 17065472,
+      "cuda_memory_peak_reserved_bytes_max": 23068672,
+      "retained_gradient_outputs_max": 0,
+      "output_checksum_mean": 2.0000003576278687,
+      "input_grad_norm_sum_mean": 0.0
+    },
+    {
+      "api": "manual",
+      "k": 1,
+      "chunk_len": 1,
+      "timesteps": 2,
+      "batch_size": 1,
+      "n_modes": 3,
+      "n_photons": 1,
+      "memristor_count": 1,
+      "entangling_layers": 1,
+      "device": "cuda",
+      "seconds_mean": 0.014796292000028188,
+      "seconds_min": 0.014796292000028188,
+      "layer_output_calls_mean": 2,
+      "process_calls_total_mean": 2,
+      "rss_peak_bytes_max": 1273991168,
+      "rss_peak_delta_bytes_max": 0,
+      "rss_end_delta_bytes_max": 86016,
+      "tracemalloc_peak_bytes_max": 80708,
+      "cuda_memory_peak_allocated_bytes_max": 17065472,
+      "cuda_memory_peak_reserved_bytes_max": 23068672,
+      "retained_gradient_outputs_max": 0,
+      "output_checksum_mean": 2.0000003576278687,
+      "input_grad_norm_sum_mean": 0.0
+    }
+  ],
+  "comparisons": [
+    {
+      "k": 1,
+      "chunk_len": 1,
+      "timesteps": 2,
+      "batch_size": 1,
+      "n_modes": 3,
+      "n_photons": 1,
+      "memristor_count": 1,
+      "entangling_layers": 1,
+      "device": "cuda",
+      "seconds_ratio_blackbox_over_manual": 16.602253659225287,
+      "layer_output_call_ratio_blackbox_over_manual": 1.0,
+      "process_call_ratio_blackbox_over_manual": 1.0,
+      "output_checksum_abs_delta": 0.0,
+      "input_grad_norm_sum_abs_delta": 0.0,
+      "blackbox_rss_peak_bytes": 1273901056,
+      "manual_rss_peak_bytes": 1273991168,
+      "blackbox_rss_peak_delta_bytes": 368660480,
+      "manual_rss_peak_delta_bytes": 0,
+      "blackbox_tracemalloc_peak_bytes": 71073,
+      "manual_tracemalloc_peak_bytes": 80708,
+      "blackbox_cuda_memory_peak_allocated_bytes": 17065472,
+      "manual_cuda_memory_peak_allocated_bytes": 17065472
+    }
+  ],
+  "runs": [
+    {
+      "api": "blackbox",
+      "config": {
+        "n_modes": 3,
+        "n_photons": 1,
+        "input_size": 1,
+        "memristor_count": 1,
+        "entangling_layers": 1,
+        "batch_size": 1,
+        "timesteps": 2,
+        "k": 1,
+        "chunk_len": 1,
+        "seed": 1234,
+        "device": "cuda"
+      },
+      "seconds": 0.24565179300043383,
+      "layer_output_calls": 2,
+      "process_calls": {
+        "compute": 2,
+        "compute_superposition_state": 0,
+        "compute_ebs_simultaneously": 0
+      },
+      "process_calls_total": 2,
+      "rss_start_bytes": 905240576,
+      "rss_peak_bytes": 1273901056,
+      "rss_end_bytes": 1273958400,
+      "rss_peak_delta_bytes": 368660480,
+      "rss_end_delta_bytes": 368717824,
+      "tracemalloc_peak_bytes": 71073,
+      "cuda_memory_start_allocated_bytes": 8526336,
+      "cuda_memory_end_allocated_bytes": 17050624,
+      "cuda_memory_peak_allocated_bytes": 17065472,
+      "cuda_memory_start_reserved_bytes": 23068672,
+      "cuda_memory_end_reserved_bytes": 23068672,
+      "cuda_memory_peak_reserved_bytes": 23068672,
+      "retained_gradient_outputs": 0,
+      "history_lengths": [
+        3
+      ],
+      "output_checksum": 2.0000003576278687,
+      "input_grad_norm_sum": 0.0,
+      "input_grad_norms": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "api": "manual",
+      "config": {
+        "n_modes": 3,
+        "n_photons": 1,
+        "input_size": 1,
+        "memristor_count": 1,
+        "entangling_layers": 1,
+        "batch_size": 1,
+        "timesteps": 2,
+        "k": 1,
+        "chunk_len": 1,
+        "seed": 1234,
+        "device": "cuda"
+      },
+      "seconds": 0.014796292000028188,
+      "layer_output_calls": 2,
+      "process_calls": {
+        "compute": 2,
+        "compute_superposition_state": 0,
+        "compute_ebs_simultaneously": 0
+      },
+      "process_calls_total": 2,
+      "rss_start_bytes": 1273991168,
+      "rss_peak_bytes": 1273991168,
+      "rss_end_bytes": 1274077184,
+      "rss_peak_delta_bytes": 0,
+      "rss_end_delta_bytes": 86016,
+      "tracemalloc_peak_bytes": 80708,
+      "cuda_memory_start_allocated_bytes": 17046016,
+      "cuda_memory_end_allocated_bytes": 17050624,
+      "cuda_memory_peak_allocated_bytes": 17065472,
+      "cuda_memory_start_reserved_bytes": 23068672,
+      "cuda_memory_end_reserved_bytes": 23068672,
+      "cuda_memory_peak_reserved_bytes": 23068672,
+      "retained_gradient_outputs": 0,
+      "history_lengths": [
+        3
+      ],
+      "output_checksum": 2.0000003576278687,
+      "input_grad_norm_sum": 0.0,
+      "input_grad_norms": [
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "notes": {
+    "blackbox": "num_backprop_steps=k, automatic bounded memristive window",
+    "manual": "num_backprop_steps=None, user calls detach_memristive_state() at chunk boundaries",
+    "rss": "RSS requires optional psutil; tracemalloc captures Python allocations, not all PyTorch native allocations."
+  },
+  "environment": {
+    "python": "3.12.3 (main, Mar  3 2026, 12:15:18) [GCC 13.3.0]",
+    "platform": "Linux-6.8.0-107-generic-x86_64-with-glibc2.39",
+    "torch_version": "2.10.0+cu128",
+    "torch_cuda_available": true,
+    "requested_device": "cuda",
+    "cuda_device_name": "NVIDIA L4",
+    "cuda_device_index": 0,
+    "cuda_runtime_version": "12.8",
+    "cuda_device_capability": [
+      8,
+      9
+    ],
+    "cuda_total_memory_bytes": 23669637120
+  }
+}

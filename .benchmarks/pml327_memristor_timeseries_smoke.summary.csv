@@ -1,0 +1,4 @@
+api,batch_size,chunk_len,epochs,final_train_loss_mean,final_validation_loss_mean,k,memristor_count,n_batches,n_modes,n_photons,optimizer_steps_mean,process_calls_total_mean,rss_peak_delta_bytes_max,seconds_mean,timesteps,tracemalloc_peak_bytes_max,train_seconds_mean,trainable_parameter_count,val_batches,validation_seconds_mean
+blackbox,4,2,2,1.0522717634836833,1.0791480441888173,2,1,2,4,2,4,48,180224,0.4749978999607265,6,37766,0.40187379997223616,97,1,0.07251399999950081
+manual,4,2,2,1.0522717634836833,1.0791480441888173,2,1,2,4,2,4,36,32768,0.33811950008384883,6,40045,0.273937999852933,97,1,0.06366569991223514
+reservoir,4,2,2,1.0522719273964565,1.079148103793462,2,1,2,4,2,4,36,3108864,0.4667893999721855,6,49885,0.40033920004498214,97,1,0.06564839987549931

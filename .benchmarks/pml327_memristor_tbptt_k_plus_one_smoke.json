@@ -1,0 +1,144 @@
+{
+  "summary": [
+    {
+      "api": "blackbox",
+      "k": 2,
+      "chunk_len": 3,
+      "timesteps": 6,
+      "batch_size": 1,
+      "n_modes": 3,
+      "n_photons": 2,
+      "seconds_mean": 0.06218480004463345,
+      "seconds_min": 0.06218480004463345,
+      "layer_output_calls_mean": 10,
+      "process_calls_total_mean": 10,
+      "rss_peak_bytes_max": 375078912,
+      "tracemalloc_peak_bytes_max": 32107,
+      "retained_gradient_outputs_max": 0,
+      "output_checksum_mean": 5.9999940395355225,
+      "input_grad_norm_sum_mean": 0.03408186510205269
+    },
+    {
+      "api": "manual",
+      "k": 2,
+      "chunk_len": 3,
+      "timesteps": 6,
+      "batch_size": 1,
+      "n_modes": 3,
+      "n_photons": 2,
+      "seconds_mean": 0.029888099990785122,
+      "seconds_min": 0.029888099990785122,
+      "layer_output_calls_mean": 6,
+      "process_calls_total_mean": 6,
+      "rss_peak_bytes_max": 375169024,
+      "tracemalloc_peak_bytes_max": 22627,
+      "retained_gradient_outputs_max": 0,
+      "output_checksum_mean": 5.9999940395355225,
+      "input_grad_norm_sum_mean": 0.03407361241988838
+    }
+  ],
+  "comparisons": [
+    {
+      "k": 2,
+      "chunk_len": 3,
+      "timesteps": 6,
+      "batch_size": 1,
+      "n_modes": 3,
+      "n_photons": 2,
+      "seconds_ratio_blackbox_over_manual": 2.0805872592706063,
+      "layer_output_call_ratio_blackbox_over_manual": 1.6666666666666667,
+      "process_call_ratio_blackbox_over_manual": 1.6666666666666667,
+      "output_checksum_abs_delta": 0.0,
+      "input_grad_norm_sum_abs_delta": 8.252682164311409e-06,
+      "blackbox_rss_peak_bytes": 375078912,
+      "manual_rss_peak_bytes": 375169024,
+      "blackbox_tracemalloc_peak_bytes": 32107,
+      "manual_tracemalloc_peak_bytes": 22627
+    }
+  ],
+  "runs": [
+    {
+      "api": "blackbox",
+      "config": {
+        "n_modes": 3,
+        "n_photons": 2,
+        "input_size": 2,
+        "batch_size": 1,
+        "timesteps": 6,
+        "k": 2,
+        "chunk_len": 3,
+        "seed": 1234
+      },
+      "seconds": 0.06218480004463345,
+      "layer_output_calls": 10,
+      "process_calls": {
+        "compute": 10,
+        "compute_superposition_state": 0,
+        "compute_ebs_simultaneously": 0
+      },
+      "process_calls_total": 10,
+      "rss_start_bytes": 369459200,
+      "rss_peak_bytes": 375078912,
+      "rss_end_bytes": 375083008,
+      "tracemalloc_peak_bytes": 32107,
+      "retained_gradient_outputs": 0,
+      "history_lengths": [
+        7
+      ],
+      "output_checksum": 5.9999940395355225,
+      "input_grad_norm_sum": 0.03408186510205269,
+      "input_grad_norms": [
+        0.0014579675626009703,
+        0.002327827038243413,
+        0.006210067309439182,
+        0.015711966902017593,
+        0.0038577625527977943,
+        0.004516273736953735
+      ]
+    },
+    {
+      "api": "manual",
+      "config": {
+        "n_modes": 3,
+        "n_photons": 2,
+        "input_size": 2,
+        "batch_size": 1,
+        "timesteps": 6,
+        "k": 2,
+        "chunk_len": 3,
+        "seed": 1234
+      },
+      "seconds": 0.029888099990785122,
+      "layer_output_calls": 6,
+      "process_calls": {
+        "compute": 6,
+        "compute_superposition_state": 0,
+        "compute_ebs_simultaneously": 0
+      },
+      "process_calls_total": 6,
+      "rss_start_bytes": 375164928,
+      "rss_peak_bytes": 375169024,
+      "rss_end_bytes": 375169024,
+      "tracemalloc_peak_bytes": 22627,
+      "retained_gradient_outputs": 0,
+      "history_lengths": [
+        7
+      ],
+      "output_checksum": 5.9999940395355225,
+      "input_grad_norm_sum": 0.03407361241988838,
+      "input_grad_norms": [
+        0.0014592998195439577,
+        0.002327829133719206,
+        0.006210067309439182,
+        0.01570238545536995,
+        0.0038577569648623466,
+        0.004516273736953735
+      ]
+    }
+  ],
+  "notes": {
+    "blackbox": "num_backprop_steps=k, automatic bounded memristive window",
+    "manual": "num_backprop_steps=None, user calls detach_memristive_state() at chunk boundaries",
+    "rss": "RSS requires optional psutil; tracemalloc captures Python allocations, not all PyTorch native allocations."
+  }
+}

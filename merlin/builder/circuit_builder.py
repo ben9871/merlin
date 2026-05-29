@@ -476,7 +476,7 @@ class CircuitBuilder:
         update_rule: Callable,
         initial_state: float,
         name: str | None = None,
-        num_backprop_steps: int = 0,
+        num_backprop_steps: int | None = 0,
     ) -> "CircuitBuilder":
         """Add a memristive phase shifter that will update in regards to the update rule after each forward pass.
 
@@ -492,8 +492,11 @@ class CircuitBuilder:
            The initial value of the phase shifter. This will be the value used after each :meth:`~merlin.algorithms.layer.QuantumLayer.reset` call
         name : str | None
             Prefix used for the generated memristive phase shifter parameter. Defaults to ``"mem"``.
-        num_backprop_steps: int
-            The number of steps in this memristor history the back propagation can access for gradient calculation in the QuantumLayer. Default value is 0.
+        num_backprop_steps: int | None
+            The number of steps in this memristor history the back propagation
+            can access for gradient calculation in the QuantumLayer. If
+            ``None``, the full memristive history remains differentiable until
+            the layer state is explicitly detached. Default value is 0.
 
         Returns
         -------
@@ -512,10 +515,15 @@ class CircuitBuilder:
             raise ValueError(
                 f"The assigned mode must be between 0 and CircuitBuilder.n_modes ({self.n_modes} here). Got {mode}."
             )
-        if (not isinstance(num_backprop_steps, int)) or num_backprop_steps < 0:
-            raise ValueError(
-                f"The `num_backprop_steps` parameter must be a positive interger. Got {type(num_backprop_steps)}: {num_backprop_steps}."
-            )
+        if num_backprop_steps is not None:
+            if type(num_backprop_steps) is not int:
+                raise TypeError(
+                    f"The `num_backprop_steps` parameter must be an int or None. Got {type(num_backprop_steps)}."
+                )
+            if num_backprop_steps < 0:
+                raise ValueError(
+                    f"The `num_backprop_steps` parameter must be non-negative. Got {num_backprop_steps}."
+                )
 
         scalar_initial_state = initial_state
         if isinstance(initial_state, torch.Tensor):

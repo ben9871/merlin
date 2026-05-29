@@ -1,0 +1,345 @@
+{
+  "summary": [
+    {
+      "api": "blackbox",
+      "k": 2,
+      "chunk_len": 2,
+      "timesteps": 6,
+      "batch_size": 4,
+      "n_batches": 2,
+      "val_batches": 1,
+      "epochs": 2,
+      "n_modes": 4,
+      "n_photons": 2,
+      "memristor_count": 1,
+      "seconds_mean": 0.4749978999607265,
+      "train_seconds_mean": 0.40187379997223616,
+      "validation_seconds_mean": 0.07251399999950081,
+      "process_calls_total_mean": 48,
+      "rss_peak_delta_bytes_max": 180224,
+      "tracemalloc_peak_bytes_max": 37766,
+      "optimizer_steps_mean": 4,
+      "final_train_loss_mean": 1.0522717634836833,
+      "final_validation_loss_mean": 1.0791480441888173,
+      "trainable_parameter_count": 97
+    },
+    {
+      "api": "manual",
+      "k": 2,
+      "chunk_len": 2,
+      "timesteps": 6,
+      "batch_size": 4,
+      "n_batches": 2,
+      "val_batches": 1,
+      "epochs": 2,
+      "n_modes": 4,
+      "n_photons": 2,
+      "memristor_count": 1,
+      "seconds_mean": 0.33811950008384883,
+      "train_seconds_mean": 0.273937999852933,
+      "validation_seconds_mean": 0.06366569991223514,
+      "process_calls_total_mean": 36,
+      "rss_peak_delta_bytes_max": 32768,
+      "tracemalloc_peak_bytes_max": 40045,
+      "optimizer_steps_mean": 4,
+      "final_train_loss_mean": 1.0522717634836833,
+      "final_validation_loss_mean": 1.0791480441888173,
+      "trainable_parameter_count": 97
+    },
+    {
+      "api": "reservoir",
+      "k": 2,
+      "chunk_len": 2,
+      "timesteps": 6,
+      "batch_size": 4,
+      "n_batches": 2,
+      "val_batches": 1,
+      "epochs": 2,
+      "n_modes": 4,
+      "n_photons": 2,
+      "memristor_count": 1,
+      "seconds_mean": 0.4667893999721855,
+      "train_seconds_mean": 0.40033920004498214,
+      "validation_seconds_mean": 0.06564839987549931,
+      "process_calls_total_mean": 36,
+      "rss_peak_delta_bytes_max": 3108864,
+      "tracemalloc_peak_bytes_max": 49885,
+      "optimizer_steps_mean": 4,
+      "final_train_loss_mean": 1.0522719273964565,
+      "final_validation_loss_mean": 1.079148103793462,
+      "trainable_parameter_count": 97
+    }
+  ],
+  "comparisons": [
+    {
+      "k": 2,
+      "chunk_len": 2,
+      "timesteps": 6,
+      "batch_size": 4,
+      "n_batches": 2,
+      "val_batches": 1,
+      "epochs": 2,
+      "n_modes": 4,
+      "n_photons": 2,
+      "memristor_count": 1,
+      "manual_seconds_mean": 0.33811950008384883,
+      "manual_final_validation_loss": 1.0791480441888173,
+      "blackbox_seconds_mean": 0.4749978999607265,
+      "blackbox_final_validation_loss": 1.0791480441888173,
+      "seconds_ratio_blackbox_over_manual": 1.4048225548746338,
+      "process_call_ratio_blackbox_over_manual": 1.3333333333333333,
+      "validation_loss_delta_blackbox_minus_manual": 0.0,
+      "reservoir_seconds_mean": 0.4667893999721855,
+      "reservoir_final_validation_loss": 1.079148103793462,
+      "seconds_ratio_reservoir_over_manual": 1.3805456350681589,
+      "validation_loss_delta_reservoir_minus_manual": 5.960464477539063e-08
+    }
+  ],
+  "runs": [
+    {
+      "api": "reservoir",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 1,
+        "entangling_layers": 2,
+        "batch_size": 4,
+        "timesteps": 6,
+        "n_batches": 2,
+        "val_batches": 1,
+        "epochs": 2,
+        "k": 2,
+        "chunk_len": 2,
+        "hidden_size": 6,
+        "learning_rate": 0.01,
+        "seed": 9876
+      },
+      "seconds": 0.4667893999721855,
+      "train_seconds": 0.40033920004498214,
+      "validation_seconds": 0.06564839987549931,
+      "layer_output_calls": 36,
+      "process_calls_total": 36,
+      "rss_start_bytes": 398974976,
+      "rss_peak_bytes": 402083840,
+      "rss_end_bytes": 402087936,
+      "rss_peak_delta_bytes": 3108864,
+      "rss_end_delta_bytes": 3112960,
+      "tracemalloc_peak_bytes": 49885,
+      "optimizer_steps": 4,
+      "train_epoch_losses": [
+        1.1554067234198253,
+        1.0522719273964565
+      ],
+      "validation_epoch_losses": [
+        1.2070704599221547,
+        1.079148103793462
+      ],
+      "final_train_loss": 1.0522719273964565,
+      "final_validation_loss": 1.079148103793462,
+      "trainable_parameter_count": 97
+    },
+    {
+      "api": "manual",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 1,
+        "entangling_layers": 2,
+        "batch_size": 4,
+        "timesteps": 6,
+        "n_batches": 2,
+        "val_batches": 1,
+        "epochs": 2,
+        "k": 2,
+        "chunk_len": 2,
+        "hidden_size": 6,
+        "learning_rate": 0.01,
+        "seed": 9876
+      },
+      "seconds": 0.33811950008384883,
+      "train_seconds": 0.273937999852933,
+      "validation_seconds": 0.06366569991223514,
+      "layer_output_calls": 36,
+      "process_calls_total": 36,
+      "rss_start_bytes": 402403328,
+      "rss_peak_bytes": 402436096,
+      "rss_end_bytes": 402436096,
+      "rss_peak_delta_bytes": 32768,
+      "rss_end_delta_bytes": 32768,
+      "tracemalloc_peak_bytes": 40045,
+      "optimizer_steps": 4,
+      "train_epoch_losses": [
+        1.1554067234198253,
+        1.0522717634836833
+      ],
+      "validation_epoch_losses": [
+        1.2070703208446503,
+        1.0791480441888173
+      ],
+      "final_train_loss": 1.0522717634836833,
+      "final_validation_loss": 1.0791480441888173,
+      "trainable_parameter_count": 97
+    },
+    {
+      "api": "blackbox",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 1,
+        "entangling_layers": 2,
+        "batch_size": 4,
+        "timesteps": 6,
+        "n_batches": 2,
+        "val_batches": 1,
+        "epochs": 2,
+        "k": 2,
+        "chunk_len": 2,
+        "hidden_size": 6,
+        "learning_rate": 0.01,
+        "seed": 9876
+      },
+      "seconds": 0.4749978999607265,
+      "train_seconds": 0.40187379997223616,
+      "validation_seconds": 0.07251399999950081,
+      "layer_output_calls": 48,
+      "process_calls_total": 48,
+      "rss_start_bytes": 402436096,
+      "rss_peak_bytes": 402616320,
+      "rss_end_bytes": 402616320,
+      "rss_peak_delta_bytes": 180224,
+      "rss_end_delta_bytes": 180224,
+      "tracemalloc_peak_bytes": 37766,
+      "optimizer_steps": 4,
+      "train_epoch_losses": [
+        1.1554067234198253,
+        1.0522717634836833
+      ],
+      "validation_epoch_losses": [
+        1.2070703208446503,
+        1.0791480441888173
+      ],
+      "final_train_loss": 1.0522717634836833,
+      "final_validation_loss": 1.0791480441888173,
+      "trainable_parameter_count": 97
+    }
+  ],
+  "prediction_snapshots": [
+    {
+      "api": "reservoir",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 1,
+        "entangling_layers": 2,
+        "batch_size": 4,
+        "timesteps": 6,
+        "n_batches": 2,
+        "val_batches": 1,
+        "epochs": 2,
+        "k": 2,
+        "chunk_len": 2,
+        "hidden_size": 6,
+        "learning_rate": 0.01,
+        "seed": 9876
+      },
+      "target": [
+        -1.665176272392273,
+        -1.272612452507019,
+        -0.6302995085716248,
+        -0.1561485081911087,
+        0.4065515100955963,
+        0.805688738822937
+      ],
+      "prediction": [
+        -0.28191477060317993,
+        -0.28145042061805725,
+        -0.2810991406440735,
+        -0.2808323800563812,
+        -0.2806289792060852,
+        -0.2804730534553528
+      ]
+    },
+    {
+      "api": "manual",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 1,
+        "entangling_layers": 2,
+        "batch_size": 4,
+        "timesteps": 6,
+        "n_batches": 2,
+        "val_batches": 1,
+        "epochs": 2,
+        "k": 2,
+        "chunk_len": 2,
+        "hidden_size": 6,
+        "learning_rate": 0.01,
+        "seed": 9876
+      },
+      "target": [
+        -1.665176272392273,
+        -1.272612452507019,
+        -0.6302995085716248,
+        -0.1561485081911087,
+        0.4065515100955963,
+        0.805688738822937
+      ],
+      "prediction": [
+        -0.28191474080085754,
+        -0.28145039081573486,
+        -0.28109902143478394,
+        -0.28083232045173645,
+        -0.28062888979911804,
+        -0.28047293424606323
+      ]
+    },
+    {
+      "api": "blackbox",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 1,
+        "entangling_layers": 2,
+        "batch_size": 4,
+        "timesteps": 6,
+        "n_batches": 2,
+        "val_batches": 1,
+        "epochs": 2,
+        "k": 2,
+        "chunk_len": 2,
+        "hidden_size": 6,
+        "learning_rate": 0.01,
+        "seed": 9876
+      },
+      "target": [
+        -1.665176272392273,
+        -1.272612452507019,
+        -0.6302995085716248,
+        -0.1561485081911087,
+        0.4065515100955963,
+        0.805688738822937
+      ],
+      "prediction": [
+        -0.28191474080085754,
+        -0.28145039081573486,
+        -0.28109902143478394,
+        -0.28083232045173645,
+        -0.28062888979911804,
+        -0.28047293424606323
+      ]
+    }
+  ],
+  "notes": {
+    "task": "Synthetic nonlinear delayed next-step time-series forecasting.",
+    "reservoir": "num_backprop_steps=0",
+    "manual": "num_backprop_steps=None with explicit detach_memristive_state at chunk boundaries",
+    "blackbox": "num_backprop_steps=k with the same chunk boundaries"
+  }
+}

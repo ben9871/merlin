@@ -1,0 +1,3 @@
+batch_size,blackbox_rss_peak_bytes,blackbox_rss_peak_delta_bytes,blackbox_tracemalloc_peak_bytes,chunk_len,entangling_layers,input_grad_norm_sum_abs_delta,k,layer_output_call_ratio_blackbox_over_manual,manual_rss_peak_bytes,manual_rss_peak_delta_bytes,manual_tracemalloc_peak_bytes,memristor_count,n_modes,n_photons,output_checksum_abs_delta,process_call_ratio_blackbox_over_manual,seconds_ratio_blackbox_over_manual,timesteps
+1,374263808,6107136,26716,2,2,0.0,2,1.5,374427648,28672,21254,1,4,2,0.0,1.5,1.346542473848811,4
+1,374435840,0,26561,2,2,0.0,2,1.5,374439936,0,19098,2,4,2,0.0,1.5,1.361015971732298,4

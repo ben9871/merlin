@@ -1,0 +1,3 @@
+api,batch_size,chunk_len,cuda_memory_peak_allocated_bytes_max,cuda_memory_peak_reserved_bytes_max,device,entangling_layers,input_grad_norm_sum_mean,k,layer_output_calls_mean,memristor_count,n_modes,n_photons,output_checksum_mean,process_calls_total_mean,retained_gradient_outputs_max,rss_end_delta_bytes_max,rss_peak_bytes_max,rss_peak_delta_bytes_max,seconds_mean,seconds_min,timesteps,tracemalloc_peak_bytes_max
+blackbox,1,1,17065472,23068672,cuda,1,0.0,1,2,1,3,1,2.0000003576278687,2,0,368717824,1273901056,368660480,0.24565179300043383,0.24565179300043383,2,71073
+manual,1,1,17065472,23068672,cuda,1,0.0,1,2,1,3,1,2.0000003576278687,2,0,86016,1273991168,0,0.014796292000028188,0.014796292000028188,2,80708

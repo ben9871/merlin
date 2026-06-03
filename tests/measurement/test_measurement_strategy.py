@@ -525,13 +525,66 @@ class TestQuantumLayerMeasurementStrategy:
                 occupancy_readout=True,
             )
 
-    def test_occupancy_readout_rejects_grouping(self):
-        """Occupancy readout owns key-aware reduction and rejects extra grouping."""
-        with pytest.raises(ValueError, match="grouping"):
-            MeasurementStrategy.probs(
+    def test_occupancy_readout_applies_before_grouping(self):
+        """Occupancy readout should reduce keys before ordinary grouping."""
+        torch.manual_seed(0)
+
+        builder = ML.CircuitBuilder(n_modes=4)
+        builder.add_entangling_layer(trainable=True, name="U1")
+        builder.add_angle_encoding(modes=[0, 1], name="input")
+        builder.add_entangling_layer(trainable=True, name="U2")
+
+        x = torch.rand(2, 2)
+        ungrouped_layer = ML.QuantumLayer(
+            input_size=2,
+            n_photons=2,
+            builder=builder,
+            measurement_strategy=MeasurementStrategy.probs(
+                computation_space=ComputationSpace.FOCK
+            ),
+        )
+
+        ungrouped_output = ungrouped_layer(x)
+        reference_keys, occupancy_reference = _reference_occupancy_readout(
+            ungrouped_layer.output_keys,
+            ungrouped_output,
+        )
+        grouping = LexGrouping(len(reference_keys), 2)
+        grouped_layer = ML.QuantumLayer(
+            input_size=2,
+            n_photons=2,
+            builder=builder,
+            measurement_strategy=MeasurementStrategy.probs(
                 computation_space=ComputationSpace.FOCK,
-                grouping=LexGrouping(4, 2),
+                grouping=grouping,
                 occupancy_readout=True,
+            ),
+        )
+        grouped_layer.load_state_dict(ungrouped_layer.state_dict())
+
+        output = grouped_layer(x)
+
+        assert grouped_layer.output_size == grouping.output_size
+        assert tuple(grouped_layer.output_keys) == reference_keys
+        assert output.shape == (2, grouping.output_size)
+        assert torch.allclose(output, grouping(occupancy_reference), atol=1e-6)
+
+    def test_occupancy_readout_validates_grouping_input_size(self):
+        """Grouping after occupancy readout must match the reduced readout width."""
+        builder = ML.CircuitBuilder(n_modes=4)
+        builder.add_entangling_layer(trainable=True, name="U1")
+        builder.add_angle_encoding(modes=[0, 1], name="input")
+
+        with pytest.raises(ValueError, match="occupancy readout output size"):
+            ML.QuantumLayer(
+                input_size=2,
+                n_photons=2,
+                builder=builder,
+                measurement_strategy=MeasurementStrategy.probs(
+                    computation_space=ComputationSpace.FOCK,
+                    grouping=LexGrouping(4, 2),
+                    occupancy_readout=True,
+                ),
             )
 
     def test_occupancy_readout_requires_bool(self):

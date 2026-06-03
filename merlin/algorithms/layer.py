@@ -366,7 +366,6 @@ class QuantumLayer(MerlinModule):
         self._measurement_output_keys: list[tuple[int, ...]] = []
         self._probability_readout_output_keys: list[tuple[int, ...]] | None = None
         self._probability_readout: _OccupancyReadout | None = None
-        self._measurement_grouping: nn.Module | None = None
         self._detector_is_identity = True
         self._output_size = 0
         self._current_params: dict[str, Any] = {}
@@ -562,13 +561,6 @@ class QuantumLayer(MerlinModule):
         self._measurement_output_keys = list(keys)
         self._probability_readout_output_keys = None
         self._probability_readout = None
-        self._measurement_grouping = None
-        if (
-            isinstance(measurement_strategy, MeasurementStrategy)
-            and measurement_strategy.grouping is not None
-            and kind in (MeasurementKind.PROBABILITIES, MeasurementKind.PARTIAL)
-        ):
-            self._measurement_grouping = measurement_strategy.grouping
         if (
             kind == MeasurementKind.PROBABILITIES
             and isinstance(measurement_strategy, MeasurementStrategy)
@@ -607,6 +599,19 @@ class QuantumLayer(MerlinModule):
                 for key in self._probability_readout.output_keys
             ]
             self._output_size = len(self._probability_readout_output_keys)
+            grouping = (
+                measurement_strategy.grouping
+                if isinstance(measurement_strategy, MeasurementStrategy)
+                else None
+            )
+            if grouping is not None:
+                if grouping.input_size != self._probability_readout.output_size:
+                    raise ValueError(
+                        "When occupancy_readout=True, grouping input_size must "
+                        "match the occupancy readout output size "
+                        f"({self._probability_readout.output_size})."
+                    )
+                self._output_size = grouping.output_size
 
         # Create measurement mapping
         if kind == MeasurementKind.PARTIAL:
@@ -1044,19 +1049,17 @@ class QuantumLayer(MerlinModule):
 
         # Phase 6: Measurement strategy dispatch and output mapping
         strategy = resolve_measurement_strategy(self.measurement_strategy)
-        # Handle backward compatibility for backpropagation - will be removed in future
+        # Keep key-aware readout separate from optional user grouping.
+        readout: nn.Module | None = None
         grouping: nn.Module | None = None
         if isinstance(self.measurement_strategy, MeasurementStrategy):
-            if (
-                self.measurement_strategy.type is MeasurementKind.PROBABILITIES
-                and self._probability_readout is not None
-            ):
-                grouping = self._probability_readout
-            elif self.measurement_strategy.type in (
+            if self.measurement_strategy.type in (
                 MeasurementKind.PROBABILITIES,
                 MeasurementKind.PARTIAL,
             ):
-                grouping = self._measurement_grouping
+                grouping = self.measurement_strategy.grouping
+            if self.measurement_strategy.type is MeasurementKind.PROBABILITIES:
+                readout = self._probability_readout
 
         results = strategy.process(
             distribution=distribution,
@@ -1066,6 +1069,7 @@ class QuantumLayer(MerlinModule):
             sample_fn=adp.sampling_noise.pcvl_sampler,
             apply_photon_loss=self._apply_photon_loss_transform,
             apply_detectors=self._apply_detector_transform,
+            readout=readout,
             grouping=grouping,
         )
 

@@ -1,0 +1,45 @@
+{
+  "backend_stats": {
+    "merlin-count": {
+      "runs": 3,
+      "best_ssim_mean": 0.796630730018229,
+      "best_ssim_std": 0.00585251225619305,
+      "final_ssim_mean": 0.32291708059905494,
+      "final_ssim_std": 0.12708245171585436,
+      "best_iteration_mean": 627.0,
+      "seconds_mean": 1075.7699867666718
+    },
+    "reference": {
+      "runs": 3,
+      "best_ssim_mean": 0.8074753841800822,
+      "best_ssim_std": 0.013236172824719233,
+      "final_ssim_mean": 0.6590492891241526,
+      "final_ssim_std": 0.10640995673622072,
+      "best_iteration_mean": 541.6666666666666,
+      "seconds_mean": 849.6033266666685
+    }
+  },
+  "paired_deltas": [
+    {
+      "seed": 0,
+      "best_ssim_delta_merlin_minus_reference": -0.007871276794907622,
+      "final_ssim_delta_merlin_minus_reference": -0.36462828503817757,
+      "best_iteration_delta_merlin_minus_reference": 0,
+      "initial_max_abs_diff_merlin_count": 5.960464477539063e-08
+    },
+    {
+      "seed": 1,
+      "best_ssim_delta_merlin_minus_reference": -0.0027414129142051546,
+      "final_ssim_delta_merlin_minus_reference": -0.3513906484232564,
+      "best_iteration_delta_merlin_minus_reference": 843,
+      "initial_max_abs_diff_merlin_count": 5.960464477539063e-08
+    },
+    {
+      "seed": 2,
+      "best_ssim_delta_merlin_minus_reference": -0.02192127277644662,
+      "final_ssim_delta_merlin_minus_reference": -0.292377692113859,
+      "best_iteration_delta_merlin_minus_reference": -587,
+      "initial_max_abs_diff_merlin_count": 5.960464477539063e-08
+    }
+  ]
+}

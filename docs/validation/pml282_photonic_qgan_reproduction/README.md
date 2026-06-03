@@ -22,12 +22,14 @@ The default arguments match that command. The optional `merlin-list` backend is
 available to compare `PhotonicGenerator([head_0, ...])` with
 `PhotonicGenerator(head_template, count=N)`.
 
-## Committed Run
+## Committed Runs
 
-Committed artifacts are under:
+Committed per-seed artifacts are under:
 
 ```text
 docs/validation/pml282_photonic_qgan_reproduction/results/run_20260602_164222
+docs/validation/pml282_photonic_qgan_reproduction/results/seed_1_1500
+docs/validation/pml282_photonic_qgan_reproduction/results/seed_2_1500_complete
 ```
 
 Configuration:
@@ -47,32 +49,61 @@ Configuration:
 
 Summary:
 
+Single-seed summary for the original seed-0 run:
+
 | Backend | Initial max abs diff vs reference | Best iteration | Best SSIM | Final SSIM | Runtime |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | reference | n/a | `132` | `0.807675` | `0.509099` | `923.54s` |
 | merlin-count | `5.96e-08` | `132` | `0.799804` | `0.144471` | `812.93s` |
 
+## Multi-Seed Metrics
+
+Aggregate artifacts are under:
+
+```text
+docs/validation/pml282_photonic_qgan_reproduction/aggregate
+```
+
+The aggregate covers seeds `0`, `1`, and `2`, all with the same task
+configuration. The initial generator outputs match the reproduced
+implementation to numerical precision in every seed:
+
+| Seed | Initial max abs diff, MerLin vs reference | Reference best SSIM | MerLin best SSIM | Reference final SSIM | MerLin final SSIM |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| `0` | `5.96e-08` | `0.807675` | `0.799804` | `0.509099` | `0.144471` |
+| `1` | `5.96e-08` | `0.791165` | `0.788424` | `0.745019` | `0.393628` |
+| `2` | `5.96e-08` | `0.823585` | `0.801664` | `0.723030` | `0.430652` |
+
+Mean metrics:
+
+| Backend | Runs | Best SSIM mean | Best SSIM std | Final SSIM mean | Final SSIM std | Runtime mean |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| reference | `3` | `0.807475` | `0.013236` | `0.659049` | `0.106410` | `849.60s` |
+| merlin-count | `3` | `0.796631` | `0.005853` | `0.322917` | `0.127082` | `1075.77s` |
+
 The important parity checks are:
 
 - initial generator outputs match the reproduced implementation to numerical
-  precision;
-- the best checkpoint occurs at the same iteration for the reference and
-  MerLin `count` path;
-- best-checkpoint SSIM is close between the two implementations;
-- final-checkpoint quality is worse for MerLin in this deterministic run, which
-  is consistent with GAN instability and is why checkpoint selection is recorded.
+  precision for each seed;
+- best-checkpoint SSIM is close between the two implementations across seeds;
+- final-checkpoint quality is materially noisier than best-checkpoint quality,
+  so final SSIM alone is not a stable reproduction metric for this GAN run;
+- the MerLin path is slower on average in this local CPU run.
 
 Key artifacts:
 
-- `summary.json`: full run configuration and metric summary.
-- `training_curves.png`: loss and SSIM curves for both backends.
-- `reference/fake_progress_best.png`: best reference samples.
-- `merlin-count/fake_progress_best.png`: best MerLin samples.
-- `reference/fake_progress_last.png`: final reference samples.
-- `merlin-count/fake_progress_last.png`: final MerLin samples.
+- `aggregate/summary_by_seed.csv`: per-seed metrics.
+- `aggregate/aggregate_summary.json`: aggregate means, standard deviations,
+  and paired deltas.
+- `aggregate/ssim_by_seed.png`: best/final SSIM by seed.
+- `aggregate/training_curves_by_seed.png`: SSIM curves across seeds.
+- `*/summary.json`: full per-run configuration and metric summary.
+- `*/training_curves.png`: loss and SSIM curves for both backends.
+- `*/reference/fake_progress_best.png`: best reference samples.
+- `*/merlin-count/fake_progress_best.png`: best MerLin samples.
 
 ## Scope
 
 This validates the Adam digit task used for the MerLin photonic-QGAN path. It
 does not claim full paper reproduction across SPSA, all digits, noisy/lossy
-settings, or multiple seeds.
+settings, or the full paper-scale training budget.

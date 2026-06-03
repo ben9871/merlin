@@ -626,6 +626,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=VALIDATION_ROOT / "results",
     )
+    parser.add_argument(
+        "--run-name",
+        type=str,
+        default=None,
+        help="Output directory name. If omitted, a timestamped name is used.",
+    )
     return parser.parse_args()
 
 
@@ -633,7 +639,7 @@ def main() -> None:
     """Run all requested backend comparisons and write artifacts."""
     args = parse_args()
     cfg = _default_config(args)
-    run_name = datetime.now().strftime("run_%Y%m%d_%H%M%S")
+    run_name = args.run_name or datetime.now().strftime("run_%Y%m%d_%H%M%S")
     output_dir = args.output_root / run_name
     output_dir.mkdir(parents=True, exist_ok=False)
 

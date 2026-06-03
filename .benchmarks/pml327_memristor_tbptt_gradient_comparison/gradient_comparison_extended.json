@@ -1,0 +1,1552 @@
+{
+  "results": [
+    {
+      "k": 1,
+      "chunk_len": 1,
+      "dtype": "float32",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 3,
+        "k": 1,
+        "chunk_len": 1,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.774862766265869
+      },
+      "output_difference": {
+        "name": "output[2]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.32443079352378845
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[2]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 1.4901161193847656e-08
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.0680834949016571
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.24391064047813416
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 1,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[2]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.07033209502696991
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 2,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[2]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.06912004947662354
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 3,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[2]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 1.4901161193847656e-08
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0680834949016571
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": true
+    },
+    {
+      "k": 2,
+      "chunk_len": 2,
+      "dtype": "float32",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 5,
+        "k": 2,
+        "chunk_len": 2,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.774862766265869
+      },
+      "output_difference": {
+        "name": "output[4]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.32476404309272766
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[4]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 5.960464477539063e-08
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.06648948788642883
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.21942424774169922
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 2,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[4]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.1391453891992569
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 4,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[4]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.13497304916381836
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 5,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[4]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 5.960464477539063e-08
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.06648948788642883
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": true
+    },
+    {
+      "k": 3,
+      "chunk_len": 3,
+      "dtype": "float32",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 7,
+        "k": 3,
+        "chunk_len": 3,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.774862766265869
+      },
+      "output_difference": {
+        "name": "output[6]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.32473114132881165
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[6]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.470348358154297e-08
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.06820382177829742
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.201846182346344
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 3,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[6]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_mid",
+            "max_abs_diff": 2.8312206268310547e-07,
+            "max_reference_abs": 0.24781808257102966
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 6,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[6]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 1.4901161193847656e-07,
+            "max_reference_abs": 0.19978825747966766
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 7,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[6]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 4.470348358154297e-08
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.06820382177829742
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": true
+    },
+    {
+      "k": 4,
+      "chunk_len": 4,
+      "dtype": "float32",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 9,
+        "k": 4,
+        "chunk_len": 4,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.774862766265869
+      },
+      "output_difference": {
+        "name": "output[8]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.32457026839256287
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[8]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 2.9802322387695312e-08
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.06942985951900482
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.18920908868312836
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 4,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[8]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 5.662441253662109e-07,
+            "max_reference_abs": 0.2730550169944763
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 8,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[8]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 4.76837158203125e-07,
+            "max_reference_abs": 0.2718414068222046
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 9,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[8]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 2.9802322387695312e-08
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.06942985951900482
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": true
+    },
+    {
+      "k": 5,
+      "chunk_len": 5,
+      "dtype": "float32",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 11,
+        "k": 5,
+        "chunk_len": 5,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.774862766265869
+      },
+      "output_difference": {
+        "name": "output[10]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.32438501715660095
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[10]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 8.381903171539307e-09
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.07030897587537766
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.18011492490768433
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 5,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[10]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 1.1026859283447266e-06,
+            "max_reference_abs": 0.33850163221359253
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 10,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[10]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 1.1324882507324219e-06,
+            "max_reference_abs": 0.3451019823551178
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 11,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[10]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 8.381903171539307e-09
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.07030897587537766
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": true
+    },
+    {
+      "k": 6,
+      "chunk_len": 6,
+      "dtype": "float32",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 13,
+        "k": 6,
+        "chunk_len": 6,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.774862766265869
+      },
+      "output_difference": {
+        "name": "output[12]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.32421645522117615
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[12]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 2.9802322387695312e-08
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.07094080746173859
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.17356576025485992
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 6,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[12]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 1.8775463104248047e-06,
+            "max_reference_abs": 0.4031369090080261
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 12,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[12]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 1.9073486328125e-06,
+            "max_reference_abs": 0.4190911054611206
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 13,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[12]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 2.9802322387695312e-08
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.07094080746173859
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": true
+    },
+    {
+      "k": 8,
+      "chunk_len": 8,
+      "dtype": "float32",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 17,
+        "k": 8,
+        "chunk_len": 8,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.774862766265869
+      },
+      "output_difference": {
+        "name": "output[16]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.32396772503852844
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[16]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 6.891787052154541e-08
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.07172296941280365
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.16544587910175323
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 8,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[16]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 4.291534423828125e-06,
+            "max_reference_abs": 0.5304358601570129
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 16,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[16]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_mid",
+            "max_abs_diff": 4.470348358154297e-06,
+            "max_reference_abs": 0.655844509601593
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 17,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[16]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 6.891787052154541e-08
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.07172296941280365
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": true
+    },
+    {
+      "k": 10,
+      "chunk_len": 10,
+      "dtype": "float32",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 21,
+        "k": 10,
+        "chunk_len": 10,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.774862766265869
+      },
+      "output_difference": {
+        "name": "output[20]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.3238216042518616
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[20]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 5.960464477539063e-08
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.07212930917739868
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.16122575104236603
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 10,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[20]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 7.808208465576172e-06,
+            "max_reference_abs": 0.6681774854660034
+          },
+          "passed": false
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 20,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[20]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_mid",
+            "max_abs_diff": 8.58306884765625e-06,
+            "max_reference_abs": 0.8201717138290405
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 21,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[20]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 5.960464477539063e-08
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.07212930917739868
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": false
+    },
+    {
+      "k": 1,
+      "chunk_len": 1,
+      "dtype": "float64",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 3,
+        "k": 1,
+        "chunk_len": 1,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.7748627593100865
+      },
+      "output_difference": {
+        "name": "output[2]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.32443125039655574
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[2]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 8.326672684688674e-17
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.06808355267724174
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.24391063986500794
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 1,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[2]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.07033209675338915
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 2,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[2]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.06912012965949421
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 3,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[2]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 8.326672684688674e-17
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.06808355267724174
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": true
+    },
+    {
+      "k": 2,
+      "chunk_len": 2,
+      "dtype": "float64",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 5,
+        "k": 2,
+        "chunk_len": 2,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.7748627593100865
+      },
+      "output_difference": {
+        "name": "output[4]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.3247643694393631
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[4]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 1.1102230246251565e-16
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.06648940206492826
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.21942427280402962
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 2,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[4]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.1391454920249288
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 4,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[4]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.13497313796478733
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 5,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[4]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 1.1102230246251565e-16
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.06648940206492826
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": true
+    },
+    {
+      "k": 3,
+      "chunk_len": 3,
+      "dtype": "float64",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 7,
+        "k": 3,
+        "chunk_len": 3,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.7748627593100865
+      },
+      "output_difference": {
+        "name": "output[6]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.32473144101804774
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[6]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 2.7755575615628914e-17
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.06820382692388927
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.20184620522686153
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 3,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[6]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 1.4043585383483048e-07,
+            "max_reference_abs": 0.20665709805303162
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 6,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[6]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_mid",
+            "max_abs_diff": 1.2407346892950866e-07,
+            "max_reference_abs": 0.2461569695230132
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 7,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[6]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 2.7755575615628914e-17
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.06820382692388927
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": true
+    },
+    {
+      "k": 4,
+      "chunk_len": 4,
+      "dtype": "float64",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 9,
+        "k": 4,
+        "chunk_len": 4,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.7748627593100865
+      },
+      "output_difference": {
+        "name": "output[8]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.3245705759083656
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[8]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 1.3877787807814457e-17
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.06942976641040545
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.18920913052368735
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 4,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[8]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 4.83096654124715e-07,
+            "max_reference_abs": 0.2730550697308052
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 8,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[8]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_mid",
+            "max_abs_diff": 4.3025117038575367e-07,
+            "max_reference_abs": 0.3279159692000265
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 9,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[8]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 1.3877787807814457e-17
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.06942976641040545
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": true
+    },
+    {
+      "k": 5,
+      "chunk_len": 5,
+      "dtype": "float64",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 11,
+        "k": 5,
+        "chunk_len": 5,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.7748627593100865
+      },
+      "output_difference": {
+        "name": "output[10]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.3243854300850602
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[10]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 1.1102230246251565e-16
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.07030900480404845
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.18011499274268908
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 5,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[10]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 1.0529523691293896e-06,
+            "max_reference_abs": 0.33850185861887827
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 10,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[10]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_mid",
+            "max_abs_diff": 9.638658535759959e-07,
+            "max_reference_abs": 0.4097656416728136
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 11,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[10]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 1.1102230246251565e-16
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.07030900480404845
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": true
+    },
+    {
+      "k": 6,
+      "chunk_len": 6,
+      "dtype": "float64",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 13,
+        "k": 6,
+        "chunk_len": 6,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.7748627593100865
+      },
+      "output_difference": {
+        "name": "output[12]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.32421690918607565
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[12]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 1.6653345369377348e-16
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.07094084804990725
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.173565839407102
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 6,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[12]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 1.859399173520515e-06,
+            "max_reference_abs": 0.40313722801675084
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 12,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[12]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_mid",
+            "max_abs_diff": 1.7894966981568672e-06,
+            "max_reference_abs": 0.4917135216683056
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 13,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[12]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 1.6653345369377348e-16
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.07094084804990725
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": true
+    },
+    {
+      "k": 8,
+      "chunk_len": 8,
+      "dtype": "float64",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 17,
+        "k": 8,
+        "chunk_len": 8,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.7748627593100865
+      },
+      "output_difference": {
+        "name": "output[16]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.3239681035677933
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[16]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.85722573273506e-17
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.07172302535091152
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.16544597776955713
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 8,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[16]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 4.194373671162488e-06,
+            "max_reference_abs": 0.5304361237709169
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 16,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[16]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_mid",
+            "max_abs_diff": 4.483850691294755e-06,
+            "max_reference_abs": 0.6558451919313517
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 17,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[16]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 4.85722573273506e-17
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.07172302535091152
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": true
+    },
+    {
+      "k": 10,
+      "chunk_len": 10,
+      "dtype": "float64",
+      "config": {
+        "n_modes": 4,
+        "n_photons": 2,
+        "input_size": 2,
+        "memristor_count": 2,
+        "entangling_layers": 2,
+        "batch_size": 2,
+        "timesteps": 21,
+        "k": 10,
+        "chunk_len": 10,
+        "seed": 13,
+        "device": "cpu"
+      },
+      "initial_parameter_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 4.7748627593100865
+      },
+      "output_difference": {
+        "name": "output[20]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.3238219308391759
+      },
+      "final_input_grad_difference": {
+        "name": "input_grad[20]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 5.551115123125783e-17
+      },
+      "final_parameter_grad_difference": {
+        "name": "U_pre",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.07212929308258972
+      },
+      "final_memristive_state_difference": {
+        "name": "memristive_state[1]",
+        "max_abs_diff": 0.0,
+        "max_reference_abs": 0.1612258403809628
+      },
+      "chunks": [
+        {
+          "chunk_index": 0,
+          "end_timestep": 10,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[20]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 7.497665690636701e-06,
+            "max_reference_abs": 0.6681777480583981
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 1,
+          "end_timestep": 20,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[20]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.0
+          },
+          "parameter_grad_difference": {
+            "name": "U_mid",
+            "max_abs_diff": 8.622417771997348e-06,
+            "max_reference_abs": 0.8201724120754446
+          },
+          "passed": true
+        },
+        {
+          "chunk_index": 2,
+          "end_timestep": 21,
+          "loss_abs_diff": 0.0,
+          "input_grad_difference": {
+            "name": "input_grad[20]",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 5.551115123125783e-17
+          },
+          "parameter_grad_difference": {
+            "name": "U_pre",
+            "max_abs_diff": 0.0,
+            "max_reference_abs": 0.07212929308258972
+          },
+          "passed": true
+        }
+      ],
+      "atol": 1e-06,
+      "rtol": 1e-05,
+      "passed": true
+    }
+  ],
+  "environment": {
+    "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "torch_version": "2.10.0+cpu",
+    "torch_cuda_available": false,
+    "requested_device": "cpu"
+  },
+  "notes": {
+    "blackbox": "num_backprop_steps=k with QuantumLayer-managed finite window.",
+    "manual": "num_backprop_steps=None with detach_memristive_state() at chunk boundaries.",
+    "interpretation": "Non-zero parameter-gradient differences mean the APIs are not strictly gradient-identical for that workload and tolerance."
+  }
+}

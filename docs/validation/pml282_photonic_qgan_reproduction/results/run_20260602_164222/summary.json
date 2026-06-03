@@ -1,0 +1,72 @@
+{
+  "config": {
+    "seed": 0,
+    "digit": 0,
+    "iterations": 1500,
+    "batch_size": 4,
+    "image_size": 8,
+    "setup": "setup_c",
+    "input_state": [
+      0,
+      1,
+      0,
+      1,
+      0
+    ],
+    "gen_count": 4,
+    "pnr": false,
+    "lossy": false,
+    "noise_dim": 1,
+    "arch": [
+      "var",
+      "var",
+      "enc[2]",
+      "var",
+      "var"
+    ],
+    "lr_d": 0.0002,
+    "lr_g": 0.004,
+    "adam_beta1": 0.5,
+    "adam_beta2": 0.99,
+    "real_label": 0.9,
+    "fake_label": 0.0,
+    "gen_target": 0.9,
+    "d_steps": 1,
+    "g_steps": 3
+  },
+  "data_path": "external/reproduced_papers/data/photonic_QGAN/optdigits_csv.csv",
+  "initial_max_abs_diff_vs_reference": {
+    "merlin_list": 5.960464477539063e-08,
+    "merlin_count": 5.960464477539063e-08
+  },
+  "summaries": [
+    {
+      "backend": "reference",
+      "seconds": 923.5387287000049,
+      "final_d_loss": 0.42605292797088623,
+      "final_g_loss": 2.534334977467855,
+      "final_similarity": 0.5090993538838953,
+      "final_diversity": 0.00019532275771494412,
+      "final_ssim": 0.5090993538838953,
+      "first_ssim": 0.10048665924046904,
+      "best_iteration": 132,
+      "best_similarity": 0.8076753095087751,
+      "best_diversity": 0.040615359587369615,
+      "best_ssim": 0.8076753095087751
+    },
+    {
+      "backend": "merlin-count",
+      "seconds": 812.9314657000068,
+      "final_d_loss": 0.38722747564315796,
+      "final_g_loss": 2.7650039196014404,
+      "final_similarity": 0.1444710688457177,
+      "final_diversity": 1.5450173624920183e-06,
+      "final_ssim": 0.1444710688457177,
+      "first_ssim": 0.10048664722161922,
+      "best_iteration": 132,
+      "best_similarity": 0.7998040327138675,
+      "best_diversity": 0.05440632200733175,
+      "best_ssim": 0.7998040327138675
+    }
+  ]
+}

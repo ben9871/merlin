@@ -1045,7 +1045,7 @@ class QuantumLayer(MerlinModule):
         # Phase 6: Measurement strategy dispatch and output mapping
         strategy = resolve_measurement_strategy(self.measurement_strategy)
         # Handle backward compatibility for backpropagation - will be removed in future
-        grouping = None
+        grouping: nn.Module | None = None
         if isinstance(self.measurement_strategy, MeasurementStrategy):
             if (
                 self.measurement_strategy.type is MeasurementKind.PROBABILITIES

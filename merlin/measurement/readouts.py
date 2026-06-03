@@ -24,6 +24,7 @@
 
 from collections.abc import Sequence
 from numbers import Integral
+from typing import cast
 
 import torch
 from torch import nn
@@ -109,7 +110,9 @@ class _OccupancyReadout(nn.Module):
         else:
             matrix = probabilities.reshape(-1, self.input_size)
 
-        group_indices = self._group_indices.to(device=probabilities.device)
+        group_indices = cast(torch.Tensor, self._group_indices).to(
+            device=probabilities.device
+        )
         grouped = torch.zeros(
             matrix.shape[0],
             self.output_size,

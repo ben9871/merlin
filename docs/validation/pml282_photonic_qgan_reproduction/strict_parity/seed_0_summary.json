@@ -1,0 +1,153 @@
+{
+  "seed": 0,
+  "summaries": [
+    {
+      "seed": 0,
+      "optimizer": "adam",
+      "generator_param_init_max_abs_diff": 0.0,
+      "discriminator_param_init_max_abs_diff": 0.0,
+      "initial_generator_output_max_abs_diff": 5.960464477539063e-08,
+      "initial_discriminator_output_max_abs_diff": 0.0,
+      "discriminator_step": {
+        "loss_abs_diff": 0.0,
+        "output_max_abs_diff": 1.4901161193847656e-08,
+        "grad_max_abs_diff": 1.862645149230957e-09,
+        "grad_max_magnitude": 0.21010524034500122,
+        "grad_median_magnitude": 0.00025956358877010643,
+        "params_after_max_abs_diff": 7.450580596923828e-09,
+        "largest_param_reference_name": "model.0.weight",
+        "largest_param_merlin_name": "model.0.weight",
+        "largest_param_grad_reference": -0.0057781776413321495,
+        "largest_param_grad_merlin": -0.005778178106993437,
+        "largest_param_before_reference": -0.06736879050731659,
+        "largest_param_before_merlin": -0.06736879050731659,
+        "largest_param_after_reference": -0.06716878712177277,
+        "largest_param_after_merlin": -0.06716879457235336
+      },
+      "generator_steps": [
+        {
+          "loss_abs_diff": 0.0,
+          "output_max_abs_diff": 5.960464477539063e-08,
+          "grad_max_abs_diff": 8.149072527885437e-10,
+          "grad_max_magnitude": 0.005357145331799984,
+          "grad_median_magnitude": 0.0008528366452082992,
+          "params_after_max_abs_diff": 0.00017958879470825195,
+          "largest_param_reference_name": "models.0.phi_1_1",
+          "largest_param_merlin_name": "generator.layers.0.phi_1_1",
+          "largest_param_grad_reference": 5.322627893988852e-10,
+          "largest_param_grad_merlin": 5.6577686979863984e-11,
+          "largest_param_before_reference": -0.9218341112136841,
+          "largest_param_before_merlin": -0.9218341112136841,
+          "largest_param_after_reference": -0.9220362305641174,
+          "largest_param_after_merlin": -0.9218566417694092
+        },
+        {
+          "loss_abs_diff": 0.0,
+          "output_max_abs_diff": 4.76837158203125e-07,
+          "grad_max_abs_diff": 1.2514647096395493e-09,
+          "grad_max_magnitude": 0.0021464733872562647,
+          "grad_median_magnitude": 0.00022719023399986327,
+          "params_after_max_abs_diff": 0.00015592575073242188,
+          "largest_param_reference_name": "models.1.phi_3_1",
+          "largest_param_merlin_name": "generator.layers.1.phi_3_1",
+          "largest_param_grad_reference": -3.780323276636466e-10,
+          "largest_param_grad_merlin": 2.5355417765382526e-10,
+          "largest_param_before_reference": -2.9266273975372314,
+          "largest_param_before_merlin": -2.9266223907470703,
+          "largest_param_after_reference": -2.926586389541626,
+          "largest_param_after_merlin": -2.9267423152923584
+        },
+        {
+          "loss_abs_diff": 0.0,
+          "output_max_abs_diff": 4.172325134277344e-07,
+          "grad_max_abs_diff": 2.051820047199726e-09,
+          "grad_max_magnitude": 0.0035206982865929604,
+          "grad_median_magnitude": 0.00026292511029168963,
+          "params_after_max_abs_diff": 0.000194549560546875,
+          "largest_param_reference_name": "models.1.phi_1_1",
+          "largest_param_merlin_name": "generator.layers.1.phi_1_1",
+          "largest_param_grad_reference": 2.0671167555441627e-10,
+          "largest_param_grad_merlin": -2.7468907703998013e-10,
+          "largest_param_before_reference": 8.659838676452637,
+          "largest_param_before_merlin": 8.659876823425293,
+          "largest_param_after_reference": 8.659781455993652,
+          "largest_param_after_merlin": 8.6599760055542
+        }
+      ]
+    },
+    {
+      "seed": 0,
+      "optimizer": "sgd",
+      "generator_param_init_max_abs_diff": 0.0,
+      "discriminator_param_init_max_abs_diff": 0.0,
+      "initial_generator_output_max_abs_diff": 5.960464477539063e-08,
+      "initial_discriminator_output_max_abs_diff": 0.0,
+      "discriminator_step": {
+        "loss_abs_diff": 0.0,
+        "output_max_abs_diff": 1.4901161193847656e-08,
+        "grad_max_abs_diff": 1.862645149230957e-09,
+        "grad_max_magnitude": 0.21010524034500122,
+        "grad_median_magnitude": 0.00025956358877010643,
+        "params_after_max_abs_diff": 0.0,
+        "largest_param_reference_name": "model.0.weight",
+        "largest_param_merlin_name": "model.0.weight",
+        "largest_param_grad_reference": 0.0,
+        "largest_param_grad_merlin": 0.0,
+        "largest_param_before_reference": -0.033930644392967224,
+        "largest_param_before_merlin": -0.033930644392967224,
+        "largest_param_after_reference": -0.033930644392967224,
+        "largest_param_after_merlin": -0.033930644392967224
+      },
+      "generator_steps": [
+        {
+          "loss_abs_diff": 0.0,
+          "output_max_abs_diff": 5.960464477539063e-08,
+          "grad_max_abs_diff": 6.984919309616089e-10,
+          "grad_max_magnitude": 0.0051600150763988495,
+          "grad_median_magnitude": 0.0007800782914273441,
+          "params_after_max_abs_diff": 0.0,
+          "largest_param_reference_name": "models.0.phi_0_1",
+          "largest_param_merlin_name": "generator.layers.0.phi_0_1",
+          "largest_param_grad_reference": 0.0,
+          "largest_param_grad_merlin": 0.0,
+          "largest_param_before_reference": 4.841182231903076,
+          "largest_param_before_merlin": 4.841182231903076,
+          "largest_param_after_reference": 4.841182231903076,
+          "largest_param_after_merlin": 4.841182231903076
+        },
+        {
+          "loss_abs_diff": 0.0,
+          "output_max_abs_diff": 5.960464477539063e-08,
+          "grad_max_abs_diff": 4.656612873077393e-10,
+          "grad_max_magnitude": 0.002467796206474304,
+          "grad_median_magnitude": 0.00025753077352419496,
+          "params_after_max_abs_diff": 0.0,
+          "largest_param_reference_name": "models.0.phi_0_1",
+          "largest_param_merlin_name": "generator.layers.0.phi_0_1",
+          "largest_param_grad_reference": 0.0,
+          "largest_param_grad_merlin": 0.0,
+          "largest_param_before_reference": 4.841182231903076,
+          "largest_param_before_merlin": 4.841182231903076,
+          "largest_param_after_reference": 4.841182231903076,
+          "largest_param_after_merlin": 4.841182231903076
+        },
+        {
+          "loss_abs_diff": 0.0,
+          "output_max_abs_diff": 1.1920928955078125e-07,
+          "grad_max_abs_diff": 5.238689482212067e-10,
+          "grad_max_magnitude": 0.003087896853685379,
+          "grad_median_magnitude": 0.0003074668347835541,
+          "params_after_max_abs_diff": 0.0,
+          "largest_param_reference_name": "models.0.phi_0_1",
+          "largest_param_merlin_name": "generator.layers.0.phi_0_1",
+          "largest_param_grad_reference": 0.0,
+          "largest_param_grad_merlin": 0.0,
+          "largest_param_before_reference": 4.841182231903076,
+          "largest_param_before_merlin": 4.841182231903076,
+          "largest_param_after_reference": 4.841182231903076,
+          "largest_param_after_merlin": 4.841182231903076
+        }
+      ]
+    }
+  ]
+}

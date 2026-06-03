@@ -102,6 +102,37 @@ Key artifacts:
 - `*/reference/fake_progress_best.png`: best reference samples.
 - `*/merlin-count/fake_progress_best.png`: best MerLin samples.
 
+## Strict Parity Diagnostic
+
+Strict first-step artifacts are under:
+
+```text
+docs/validation/pml282_photonic_qgan_reproduction/strict_parity
+```
+
+The strict diagnostic compares one seed before long-run GAN drift can dominate:
+initial parameters, initial forward outputs, first discriminator step, and the
+three generator steps from the first training iteration.
+
+For seed `0`:
+
+| Check | Adam result |
+| --- | ---: |
+| generator parameter init max abs diff | `0.0` |
+| discriminator parameter init max abs diff | `0.0` |
+| initial generator output max abs diff | `5.96e-08` |
+| first discriminator loss abs diff | `0.0` |
+| first discriminator grad max abs diff | `1.86e-09` |
+| first generator loss abs diff | `0.0` |
+| first generator grad max abs diff | `8.15e-10` |
+| first generator post-Adam parameter max abs diff | `1.80e-04` |
+
+The same first generator step with SGD keeps the post-step parameter max abs
+diff at `0.0` at float32 resolution. This indicates that the implementations
+match at initialization, forward, loss, and gradient precision, while Adam can
+amplify sub-nanograd differences on near-zero-gradient parameters into visible
+trajectory drift.
+
 ## Scope
 
 This validates the Adam digit task used for the MerLin photonic-QGAN path. It

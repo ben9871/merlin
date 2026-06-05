@@ -19,7 +19,7 @@ With either backend you can:
 * Submit batched inputs; when batches are large, Merlin will **chunk** them and
   (optionally) **run chunks in parallel**.
 * Drive execution **synchronously** (``forward``) or **asynchronously**
-  (``forward_async`` returning a ``torch.futures.Future``).
+  (``forward_async`` returning a typed Merlin async handle).
 * Monitor status, collect **job IDs**, **cancel** jobs, and enforce **timeouts**.
 * Estimate **required shot counts per input** ahead of time.
 

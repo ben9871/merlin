@@ -9,7 +9,7 @@ import torch.nn as nn
 from _helpers import make_layer, spin_until
 
 from merlin.core.computation_space import ComputationSpace
-from merlin.core.merlin_processor import MerlinProcessor
+from merlin.core.merlin_processor import MerlinAsyncHandle, MerlinProcessor
 
 
 class TestFuturesAndChunking:
@@ -18,7 +18,7 @@ class TestFuturesAndChunking:
         proc = MerlinProcessor(remote_processor)
         fut = proc.forward_async(layer, torch.rand(3, 2), nsample=1500)
 
-        assert isinstance(fut, torch.futures.Future)
+        assert isinstance(fut, MerlinAsyncHandle)
         assert hasattr(fut, "cancel_remote")
         assert hasattr(fut, "status")
         assert hasattr(fut, "job_ids")

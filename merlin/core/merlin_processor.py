@@ -4,7 +4,8 @@ import time
 import uuid
 import warnings
 import zlib
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
+from concurrent.futures import CancelledError
 from contextlib import suppress
 from dataclasses import dataclass
 from numbers import Integral
@@ -39,6 +40,146 @@ class BackendCapabilities:
 
     name: str
     available_commands: tuple[str]
+
+
+class MerlinAsyncHandle:
+    """Typed handle returned by :meth:`MerlinProcessor.forward_async`.
+
+    The handle keeps Merlin-specific remote execution controls explicit while
+    wrapping the underlying :class:`torch.futures.Future` used by the worker
+    thread.
+
+    Parameters
+    ----------
+    future : torch.futures.Future
+        Internal future that resolves to the asynchronous forward result.
+    state : dict[str, Any]
+        Mutable per-call state shared with the remote polling code.
+    cancel_all : Callable[[], None]
+        Callback used to request best-effort cancellation of active remote jobs.
+    """
+
+    def __init__(
+        self,
+        future: Future,
+        state: dict[str, Any],
+        cancel_all: Callable[[], None],
+    ) -> None:
+        """Create an asynchronous Merlin forward handle.
+
+        Parameters
+        ----------
+        future : torch.futures.Future
+            Internal future that resolves to the asynchronous forward result.
+        state : dict[str, Any]
+            Mutable per-call state shared with the remote polling code.
+        cancel_all : Callable[[], None]
+            Callback used to request best-effort cancellation of active remote
+            jobs.
+
+        Returns
+        -------
+        None
+            The handle is initialized in place.
+        """
+        self._future = future
+        self._state = state
+        self._cancel_all = cancel_all
+
+    @property
+    def job_ids(self) -> list[str]:
+        """Return remote job identifiers observed for this async call.
+
+        Returns
+        -------
+        list[str]
+            Live list of remote job identifiers accumulated while the call
+            progresses.
+        """
+        return cast(list[str], self._state["job_ids"])
+
+    def wait(self) -> torch.Tensor:
+        """Block until the asynchronous call completes.
+
+        Returns
+        -------
+        torch.Tensor
+            Output tensor produced by the asynchronous forward pass.
+
+        Raises
+        ------
+        BaseException
+            Re-raises any exception set on the internal future, including
+            ``CancelledError`` and ``TimeoutError``.
+        """
+        return cast(torch.Tensor, self._future.wait())
+
+    def done(self) -> bool:
+        """Return whether the asynchronous call has completed.
+
+        Returns
+        -------
+        bool
+            ``True`` when the wrapped future has a result or exception.
+        """
+        return bool(self._future.done())
+
+    def value(self) -> torch.Tensor:
+        """Return the completed asynchronous result without blocking.
+
+        Returns
+        -------
+        torch.Tensor
+            Output tensor stored on the wrapped future.
+
+        Raises
+        ------
+        BaseException
+            Re-raises any exception set on the internal future. The underlying
+            PyTorch future may also raise if the result is not ready.
+        """
+        return cast(torch.Tensor, self._future.value())
+
+    def status(self) -> dict[str, Any]:
+        """Return current remote execution status for this call.
+
+        Returns
+        -------
+        dict[str, Any]
+            Status payload containing ``state``, ``progress``, ``message``,
+            ``chunks_total``, ``chunks_done``, and ``active_chunks``.
+        """
+        job_status = self._state.get("current_status")
+        return {
+            "state": (
+                "COMPLETE"
+                if self._future.done() and not job_status
+                else (job_status.get("state") if job_status else "IDLE")
+            ),
+            "progress": job_status.get("progress") if job_status else 0.0,
+            "message": job_status.get("message") if job_status else None,
+            "chunks_total": self._state["chunks_total"],
+            "chunks_done": self._state["chunks_done"],
+            "active_chunks": self._state["active_chunks"],
+        }
+
+    def cancel_remote(self) -> None:
+        """Request cooperative cancellation of the asynchronous remote call.
+
+        Returns
+        -------
+        None
+            Cancellation is requested in place.
+
+        Raises
+        ------
+        RuntimeError
+            If the wrapped future cannot record the cancellation exception.
+        """
+        self._state["cancel_requested"] = True
+        self._cancel_all()
+        if not self._future.done():
+            self._future.set_exception(CancelledError("Remote call was cancelled"))
 
 
 _ALLOWED_STATE_TYPES = (
@@ -316,7 +457,7 @@ class MerlinProcessor:
 
     **Key Features**
 
-    - Torch-friendly asynchronous execution via ``Future[torch.Tensor]``.
+    - Torch-friendly asynchronous execution via ``MerlinAsyncHandle``.
     - Cloud offload of quantum leaves only; non-quantum leaves run locally.
     - Batch **chunking** (``microbatch_size``) and **parallel** submission per leaf
       (``chunk_concurrency``).
@@ -649,10 +790,10 @@ class MerlinProcessor:
         *,
         nsample: int | None = None,
         timeout: float | None = None,
-    ) -> Future:
+    ) -> MerlinAsyncHandle:
         """Asynchronously execute a module, offloading quantum leaves to remote backend.
 
-        Returns a ``torch.futures.Future`` that resolves to the output tensor.
+        Returns a :class:`MerlinAsyncHandle` that resolves to the output tensor.
         Batch is automatically chunked and submitted with limited concurrency.
         Each chunk is submitted to a fresh ``RemoteProcessor`` for thread safety.
 
@@ -684,14 +825,9 @@ class MerlinProcessor:
 
         Returns
         -------
-        Future
-            ``torch.futures.Future[torch.Tensor]`` with extra attributes:
-
-            - ``future.job_ids: list[str]`` — accumulates job IDs across chunks.
-            - ``future.status() -> dict`` — current progress and state:
-              ``{"state", "progress", "message", "chunks_total", "chunks_done", "active_chunks"}``.
-            - ``future.cancel_remote() -> None`` — cooperatively cancel; awaiting
-              the future raises ``CancelledError``.
+        MerlinAsyncHandle
+            Typed asynchronous handle exposing ``wait()``, ``value()``,
+            ``done()``, ``job_ids``, ``status()``, and ``cancel_remote()``.
 
         Raises
         ------
@@ -700,7 +836,7 @@ class MerlinProcessor:
         TimeoutError
             If global timeout is exceeded; in-flight jobs are cancelled.
         concurrent.futures.CancelledError
-            If :meth:`future.cancel_remote` is called.
+            If :meth:`MerlinAsyncHandle.cancel_remote` is called.
         """
         with self._lock:
             if self._closed:
@@ -733,7 +869,7 @@ class MerlinProcessor:
         original_dtype = input.dtype
         layers: list[Any] = list(self._iter_layers_in_order(module))
 
-        fut: Future = Future()
+        future: Future = Future()
         state = {
             "cancel_requested": False,
             "current_status": None,
@@ -743,38 +879,7 @@ class MerlinProcessor:
             "active_chunks": 0,
             "call_id": uuid.uuid4().hex[:8],
         }
-
-        def _cancel_remote():
-            state["cancel_requested"] = True
-            self.cancel_all()
-            if not fut.done():
-                try:
-                    from concurrent.futures import CancelledError
-                except Exception:  # pragma: no cover
-
-                    class CancelledError(RuntimeError):
-                        pass
-
-                fut.set_exception(CancelledError("Remote call was cancelled"))
-
-        def _status():
-            js = state.get("current_status")
-            return {
-                "state": (
-                    "COMPLETE"
-                    if fut.done() and not js
-                    else (js.get("state") if js else "IDLE")
-                ),
-                "progress": js.get("progress") if js else 0.0,
-                "message": js.get("message") if js else None,
-                "chunks_total": state["chunks_total"],
-                "chunks_done": state["chunks_done"],
-                "active_chunks": state["active_chunks"],
-            }
-
-        fut.cancel_remote = _cancel_remote  # type: ignore[attr-defined]
-        fut.status = _status  # type: ignore[attr-defined]
-        fut.job_ids = state["job_ids"]  # type: ignore[attr-defined]
+        handle = MerlinAsyncHandle(future, state, self.cancel_all)
 
         def _run_pipeline():
             try:
@@ -802,14 +907,16 @@ class MerlinProcessor:
                         with torch.no_grad():
                             x = layer(x)
 
-                if not fut.done():
-                    fut.set_result(x.to(device=original_device, dtype=original_dtype))
+                if not future.done():
+                    future.set_result(
+                        x.to(device=original_device, dtype=original_dtype)
+                    )
             except BaseException as e:
-                if not fut.done():
-                    fut.set_exception(e)
+                if not future.done():
+                    future.set_exception(e)
 
         threading.Thread(target=_run_pipeline, daemon=True).start()
-        return fut
+        return handle
 
     # ---------------- Chunked offload per quantum leaf ----------------
 

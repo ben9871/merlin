@@ -17,7 +17,7 @@ classical layers local. It supports two backend paths:
 
 Both paths support batched execution with chunking, limited intra-leaf
 concurrency, per-call/global timeouts, cooperative cancellation, and a
-Torch-friendly async interface returning :class:`torch.futures.Future`.
+Torch-friendly async interface returning :class:`MerlinAsyncHandle`.
 
 Key Capabilities
 ----------------
@@ -68,6 +68,48 @@ BackendCapabilities
       caps = proc.backend_capabilities
       print(f"Platform: {caps.name}")
       print(f"Supports: {caps.available_commands}")
+
+MerlinAsyncHandle
+-----------------
+.. class:: MerlinAsyncHandle(future, state, cancel_all)
+
+   Typed handle returned by ``MerlinProcessor.forward_async``.
+
+   The handle wraps the internal :class:`torch.futures.Future` used by the
+   worker thread and exposes Merlin-specific remote execution controls without
+   monkey-patching PyTorch's future object.
+
+   **Attributes**
+
+   .. attribute:: job_ids
+
+      ``list[str]`` — live list of remote job IDs observed for this async call.
+
+   **Methods**
+
+   .. method:: wait() -> torch.Tensor
+
+      Block until the async call completes and return the output tensor.
+
+   .. method:: value() -> torch.Tensor
+
+      Return the completed output tensor using the wrapped future's non-blocking
+      value access.
+
+   .. method:: done() -> bool
+
+      Return whether the async call has completed.
+
+   .. method:: status() -> dict
+
+      Return current state/progress/message plus chunk counters:
+      ``{"state", "progress", "message", "chunks_total", "chunks_done", "active_chunks"}``.
+
+   .. method:: cancel_remote() -> None
+
+      Request cooperative cancellation. In-flight jobs are best-effort
+      cancelled and ``wait()`` raises
+      :class:`concurrent.futures.CancelledError`.
 
 MerlinProcessor
 ---------------
@@ -169,25 +211,27 @@ Execution APIs
    :raises concurrent.futures.CancelledError: If the call is cooperatively
       cancelled via the async API.
 
-.. method:: forward_async(module, input, *, nsample=None, timeout=None) -> torch.futures.Future
+.. method:: forward_async(module, input, *, nsample=None, timeout=None) -> MerlinAsyncHandle
 
-   Asynchronous execution. Returns a :class:`torch.futures.Future` with extra
-   helpers attached:
+   Asynchronous execution. Returns a :class:`MerlinAsyncHandle`.
 
-   **Future extensions**
+   **Async handle API**
 
-   * ``future.job_ids: list[str]`` — accumulates job IDs across all chunk jobs.
-   * ``future.status() -> dict`` — current state/progress/message plus chunk
+   * ``handle.wait() -> torch.Tensor`` — blocks until completion.
+   * ``handle.value() -> torch.Tensor`` — returns the completed output tensor.
+   * ``handle.done() -> bool`` — reports whether the async call is complete.
+   * ``handle.job_ids: list[str]`` — accumulates job IDs across all chunk jobs.
+   * ``handle.status() -> dict`` — current state/progress/message plus chunk
      counters: ``{"chunks_total", "chunks_done", "active_chunks"}``.
-   * ``future.cancel_remote() -> None`` — cooperative cancel; in-flight jobs are
-     best-effort cancelled and ``future.wait()`` raises
+   * ``handle.cancel_remote() -> None`` — cooperative cancel; in-flight jobs are
+     best-effort cancelled and ``handle.wait()`` raises
      ``CancelledError``.
 
    :param module: See :meth:`forward`.
    :param input: See :meth:`forward`.
    :param nsample: See :meth:`forward`.
    :param timeout: See :meth:`forward`.
-   :returns: Future that resolves to the same tensor as :meth:`forward`.
+   :returns: Typed handle that resolves to the same tensor as :meth:`forward`.
 
 Job & Lifecycle Utilities
 -------------------------
@@ -260,8 +304,8 @@ Timeouts & Cancellation
 ^^^^^^^^^^^^^^^^^^^^^^^
 * Per-call timeouts are enforced as **global deadlines**. On expiry,
   in-flight jobs are cancelled and a :class:`TimeoutError` is raised.
-* ``future.cancel_remote()`` performs cooperative cancellation; awaiting the
-  future raises :class:`concurrent.futures.CancelledError`.
+* ``handle.cancel_remote()`` performs cooperative cancellation; awaiting the
+  handle raises :class:`concurrent.futures.CancelledError`.
 
 Job Naming & Traceability
 ^^^^^^^^^^^^^^^^^^^^^^^^^

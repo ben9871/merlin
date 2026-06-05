@@ -5,29 +5,30 @@ from __future__ import annotations
 import json
 import threading
 import time
+from collections.abc import Sequence
 from concurrent.futures import CancelledError
 from dataclasses import dataclass
+from numbers import Integral
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import numpy as np
+import perceval as pcvl
 import pytest
 import torch
 from perceval.runtime import RemoteProcessor
 from perceval.runtime.session import ISession
+from torch.futures import Future
 
 import merlin.core.merlin_processor as merlin_processor_module
+from merlin.core.circuit import Circuit
 from merlin.core.merlin_processor import (
     BackendCapabilities,
+    MerlinAsyncHandle,
     MerlinProcessor,
-    ValidatedLayerConfig,
     SupportsExportConfig,
+    ValidatedLayerConfig,
 )
-from collections.abc import Sequence
-from numbers import Integral
-import perceval as pcvl
-import numpy as np
-import re
-from merlin.core.circuit import Circuit
 from merlin.core.state_vector import StateVector
 
 
@@ -159,6 +160,32 @@ class FakeLayer:
         self.computation_space = FakeComputationSpace(computation_scheme)
 
 
+class BlockingModule(torch.nn.Module):
+    """Torch module that blocks until a test releases its forward call."""
+
+    def __init__(self, entered: threading.Event, release: threading.Event) -> None:
+        super().__init__()
+        self.entered = entered
+        self.release = release
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        """Return input after the release event is set.
+
+        Parameters
+        ----------
+        input : torch.Tensor
+            Input tensor passed through by the module.
+
+        Returns
+        -------
+        torch.Tensor
+            The original input tensor.
+        """
+        self.entered.set()
+        self.release.wait(timeout=5.0)
+        return input
+
+
 def make_processor(available_commands: list[str]) -> MerlinProcessor:
     """Build an uninitialized processor configured for unit helper tests."""
     proc = MerlinProcessor.__new__(MerlinProcessor)
@@ -179,9 +206,13 @@ def make_poll_processor(output: torch.Tensor | None = None) -> MerlinProcessor:
     proc.processed_calls = []
 
     def process_results(raw_results, batch_size, layer, nsample, is_probability=False):
-        proc.processed_calls.append(
-            (raw_results, batch_size, layer, nsample, is_probability)
-        )
+        proc.processed_calls.append((
+            raw_results,
+            batch_size,
+            layer,
+            nsample,
+            is_probability,
+        ))
         return torch.tensor([[1.0]]) if output is None else output
 
     proc._process_batch_results = process_results
@@ -191,6 +222,127 @@ def make_poll_processor(output: torch.Tensor | None = None) -> MerlinProcessor:
 def make_state() -> dict:
     """Return the mutable polling state shape expected by _poll_job."""
     return {"cancel_requested": False, "job_ids": []}
+
+
+def make_async_processor() -> MerlinProcessor:
+    """Return a processor instance configured for no-cloud async tests."""
+    proc = make_processor(["probs"])
+    proc._closed = False
+    proc.default_timeout = 3600.0
+    proc.max_shots_per_call = MerlinProcessor.DEFAULT_MAX_SHOTS
+    proc.chunk_concurrency = 1
+    return proc
+
+
+# ────── Tests for MerlinAsyncHandle ──────
+
+
+def test_forward_async_returns_explicit_handle_without_monkey_patching_future():
+    """forward_async returns MerlinAsyncHandle instead of a patched torch Future."""
+    proc = make_async_processor()
+    module = torch.nn.Identity().eval()
+    input_tensor = torch.tensor([[1.0, 2.0]])
+
+    handle = proc.forward_async(module, input_tensor)
+    output = handle.wait()
+
+    assert isinstance(handle, MerlinAsyncHandle)
+    assert not isinstance(handle, Future)
+    assert torch.equal(output, input_tensor)
+    assert handle.done() is True
+    assert handle.job_ids == []
+    assert not hasattr(handle._future, "cancel_remote")
+    assert not hasattr(handle._future, "status")
+    assert not hasattr(handle._future, "job_ids")
+
+
+def test_async_handle_status_payload_and_live_job_ids():
+    """MerlinAsyncHandle exposes status and job IDs without dynamic attributes."""
+    future = Future()
+    state = {
+        "cancel_requested": False,
+        "current_status": {
+            "state": "RUNNING",
+            "progress": 0.5,
+            "message": "halfway",
+        },
+        "job_ids": ["job-1"],
+        "chunks_total": 3,
+        "chunks_done": 1,
+        "active_chunks": 2,
+    }
+    handle = MerlinAsyncHandle(future, state, lambda: None)
+
+    state["job_ids"].append("job-2")
+    status = handle.status()
+
+    assert handle.job_ids == ["job-1", "job-2"]
+    assert status == {
+        "state": "RUNNING",
+        "progress": 0.5,
+        "message": "halfway",
+        "chunks_total": 3,
+        "chunks_done": 1,
+        "active_chunks": 2,
+    }
+
+
+def test_async_handle_cancel_remote_sets_cancelled_error_and_cancels_jobs():
+    """cancel_remote requests cancellation and causes wait to raise."""
+    proc = make_async_processor()
+    job = FakeJob(is_complete=False)
+    proc._active_jobs.add(job)
+    future = Future()
+    state = {
+        "cancel_requested": False,
+        "current_status": None,
+        "job_ids": [],
+        "chunks_total": 0,
+        "chunks_done": 0,
+        "active_chunks": 0,
+    }
+    handle = MerlinAsyncHandle(future, state, proc.cancel_all)
+
+    handle.cancel_remote()
+
+    assert state["cancel_requested"] is True
+    assert job.cancelled is True
+    with pytest.raises(CancelledError, match="Remote call was cancelled"):
+        handle.wait()
+
+
+def test_forward_async_cancel_remote_interrupts_wait_without_cloud():
+    """forward_async cancellation propagates through the explicit handle."""
+    proc = make_async_processor()
+    entered = threading.Event()
+    release = threading.Event()
+    module = BlockingModule(entered, release).eval()
+    input_tensor = torch.tensor([[1.0, 2.0]])
+
+    handle = proc.forward_async(module, input_tensor)
+    assert entered.wait(timeout=2.0)
+
+    handle.cancel_remote()
+
+    with pytest.raises(CancelledError, match="Remote call was cancelled"):
+        handle.wait()
+
+    release.set()
+
+
+def test_forward_uses_async_handle_without_changing_sync_result():
+    """Synchronous forward still returns the tensor resolved by forward_async."""
+    proc = make_async_processor()
+    module = torch.nn.Sequential(
+        torch.nn.Linear(2, 2, bias=False),
+    ).eval()
+    with torch.no_grad():
+        module[0].weight.copy_(torch.eye(2))
+    input_tensor = torch.tensor([[3.0, 4.0]])
+
+    output = proc.forward(module, input_tensor)
+
+    assert torch.equal(output, input_tensor)
 
 
 # ────── Tests for BackendCapabilities ──────
@@ -313,7 +465,9 @@ def test_session_path_does_not_require_remote_processor_token():
     remote_processor.proxies = None
     session.build_remote_processor.return_value = remote_processor
 
-    with patch.object(MerlinProcessor, "_extract_rp_token", return_value=None) as extract:
+    with patch.object(
+        MerlinProcessor, "_extract_rp_token", return_value=None
+    ) as extract:
         proc = MerlinProcessor(session=session)
 
     extract.assert_not_called()
@@ -944,13 +1098,11 @@ def test_process_batch_results_zero_fills_missing_rows():
 
     assert torch.allclose(
         result,
-        torch.tensor(
-            [
-                [0.0, 1.0],
-                [0.0, 0.0],
-                [0.0, 0.0],
-            ]
-        ),
+        torch.tensor([
+            [0.0, 1.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+        ]),
     )
 
 
@@ -1232,7 +1384,7 @@ def test_different_valid_configs():
     # Sequence input torch ints as tuple
     config = {
         "circuit": pcvl.Circuit(m=2, name="Circuit"),
-        "input_state": tuple([torch.tensor(1).item(), torch.tensor(0).item()]),
+        "input_state": (torch.tensor(1).item(), torch.tensor(0).item()),
         "input_param_order": ["px", "el", "s"],
     }
     v_config = ValidatedLayerConfig(config)
@@ -1283,7 +1435,7 @@ def test_missing_required_fiels_in_configs():
         KeyError,
         match=r"There must be a key 'circuit' in the configs dictionary that is associated with a perceval.ACircuit.",
     ):
-        v_config = ValidatedLayerConfig(config)
+        ValidatedLayerConfig(config)
 
     # Missing State
     config = {
@@ -1294,7 +1446,7 @@ def test_missing_required_fiels_in_configs():
         KeyError,
         match=r".*There must be a key 'input_state' in the configs dictionary.*",
     ):
-        v_config = ValidatedLayerConfig(config)
+        ValidatedLayerConfig(config)
 
     # Missing input param order
     config = {
@@ -1305,7 +1457,7 @@ def test_missing_required_fiels_in_configs():
         KeyError,
         match=r".*There must be a key 'input_param_order' in the configs dictionary that is associated with a Sequence\[str\] or None\..*",
     ):
-        v_config = ValidatedLayerConfig(config)
+        ValidatedLayerConfig(config)
 
 
 def test_wrong_types_config():
@@ -1319,7 +1471,7 @@ def test_wrong_types_config():
         ValueError,
         match=r"The 'circuit' key of the config dictionary must be a perceval.ACircuit",
     ):
-        v_config = ValidatedLayerConfig(config)
+        ValidatedLayerConfig(config)
 
     config = {
         "circuit": Circuit(n_modes=2, components=[pcvl.components.BS()]),
@@ -1330,7 +1482,7 @@ def test_wrong_types_config():
         ValueError,
         match=r"The 'circuit' key of the config dictionary must be a perceval.ACircuit",
     ):
-        v_config = ValidatedLayerConfig(config)
+        ValidatedLayerConfig(config)
 
     # input_state
     config = {
@@ -1342,7 +1494,7 @@ def test_wrong_types_config():
         ValueError,
         match=r"'input_state' must contain only integers when it is a sequence.",
     ):
-        v_config = ValidatedLayerConfig(config)
+        ValidatedLayerConfig(config)
 
     config = {
         "circuit": pcvl.Circuit(m=2),
@@ -1353,7 +1505,7 @@ def test_wrong_types_config():
         ValueError,
         match=r"'input_state' must be None, a sequence of integers, or an Perceval state object.",
     ):
-        v_config = ValidatedLayerConfig(config)
+        ValidatedLayerConfig(config)
 
     # input_param_order
     config = {
@@ -1365,7 +1517,7 @@ def test_wrong_types_config():
         ValueError,
         match=r"'input_param_order' must be a sequence of strings or None, got int.",
     ):
-        v_config = ValidatedLayerConfig(config)
+        ValidatedLayerConfig(config)
 
     config = {
         "circuit": pcvl.Circuit(m=2),
@@ -1376,7 +1528,7 @@ def test_wrong_types_config():
         ValueError,
         match=r"'input_param_order' must contain only strings.",
     ):
-        v_config = ValidatedLayerConfig(config)
+        ValidatedLayerConfig(config)
 
 
 def test_has_export_config():

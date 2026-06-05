@@ -6,7 +6,7 @@ import warnings
 import zlib
 from collections.abc import Iterable, Sequence
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from numbers import Integral
 from typing import Any, Protocol, cast, runtime_checkable
 
@@ -39,6 +39,224 @@ class BackendCapabilities:
 
     name: str
     available_commands: tuple[str]
+
+
+@dataclass
+class CallState:
+    """Track mutable state for one asynchronous MerlinProcessor call.
+
+    The state is shared between the user-facing future helpers, the pipeline
+    thread, chunk worker threads, and remote-job polling. Mutations go through
+    named helpers so the per-call contract is typed and searchable instead of
+    relying on anonymous dictionary keys.
+
+    Attributes
+    ----------
+    cancel_requested : bool
+        Whether cooperative cancellation has been requested. Default: False.
+    current_status : dict[str, Any] | None
+        Last remote status payload with ``"state"``, ``"progress"``, and
+        ``"message"`` keys. Default: None.
+    job_ids : list[str]
+        Remote job identifiers observed during the call. Duplicate identifiers
+        are ignored. Default: empty list.
+    chunks_total : int
+        Number of chunks scheduled for the call. Default: 0.
+    chunks_done : int
+        Number of chunks that have finished. Default: 0.
+    active_chunks : int
+        Number of chunk worker threads currently active. Default: 0.
+    call_id : str
+        Short per-call identifier used in generated remote job names.
+    """
+
+    cancel_requested: bool = False
+    current_status: dict[str, Any] | None = None
+    job_ids: list[str] = field(default_factory=list)
+    chunks_total: int = 0
+    chunks_done: int = 0
+    active_chunks: int = 0
+    call_id: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
+    _lock: Any = field(
+        default_factory=threading.Lock, init=False, repr=False, compare=False
+    )
+
+    @classmethod
+    def new(cls) -> "CallState":
+        """Create a fresh per-call state object.
+
+        Returns
+        -------
+        CallState
+            State initialized with no cancellation, no observed jobs, and zero
+            chunk counters.
+        """
+        return cls()
+
+    def request_cancel(self) -> None:
+        """Mark the call as cooperatively cancelled.
+
+        Returns
+        -------
+        None
+            This method mutates the state in place.
+        """
+        with self._lock:
+            self.cancel_requested = True
+
+    def is_cancel_requested(self) -> bool:
+        """Return whether cooperative cancellation has been requested.
+
+        Returns
+        -------
+        bool
+            ``True`` when the call has been cancelled by the user-facing async
+            helper; otherwise ``False``.
+        """
+        with self._lock:
+            return self.cancel_requested
+
+    def record_job_id(self, job_id: str | None) -> None:
+        """Record a remote job identifier once.
+
+        Parameters
+        ----------
+        job_id : str | None
+            Identifier reported by the remote job. ``None`` is ignored.
+
+        Returns
+        -------
+        None
+            This method mutates ``job_ids`` in place.
+        """
+        if job_id is None:
+            return
+        with self._lock:
+            if job_id not in self.job_ids:
+                self.job_ids.append(job_id)
+
+    def set_current_status(
+        self,
+        *,
+        state: str | None,
+        progress: float | None,
+        message: str | None,
+    ) -> None:
+        """Store the latest remote status payload.
+
+        Parameters
+        ----------
+        state : str | None
+            Backend status state name.
+        progress : float | None
+            Backend progress value. ``None`` is preserved when the backend does
+            not expose progress.
+        message : str | None
+            Backend stop or status message.
+
+        Returns
+        -------
+        None
+            This method mutates the state in place.
+        """
+        with self._lock:
+            self.current_status = {
+                "state": state,
+                "progress": progress,
+                "message": message,
+            }
+
+    def add_chunks_total(self, count: int) -> None:
+        """Increase the scheduled chunk count.
+
+        Parameters
+        ----------
+        count : int
+            Number of chunks scheduled for this call.
+
+        Returns
+        -------
+        None
+            This method mutates ``chunks_total`` in place.
+
+        Raises
+        ------
+        ValueError
+            If ``count`` is negative.
+        """
+        if count < 0:
+            raise ValueError("count must be non-negative")
+        with self._lock:
+            self.chunks_total += count
+
+    def mark_chunk_started(self) -> None:
+        """Record that one chunk worker has started.
+
+        Returns
+        -------
+        None
+            This method increments ``active_chunks`` in place.
+        """
+        with self._lock:
+            self.active_chunks += 1
+
+    def mark_chunk_finished(self) -> None:
+        """Record that one chunk worker has finished.
+
+        Returns
+        -------
+        None
+            This method decrements ``active_chunks`` without going below zero
+            and increments ``chunks_done``.
+        """
+        with self._lock:
+            self.active_chunks = max(0, self.active_chunks - 1)
+            self.chunks_done += 1
+
+    def status_snapshot(self, *, is_done: bool = False) -> dict[str, Any]:
+        """Return the user-facing async status payload.
+
+        Parameters
+        ----------
+        is_done : bool
+            Whether the owning future has completed. If ``True`` and no remote
+            status has been observed, the returned state is ``"COMPLETE"``.
+            Default: False.
+
+        Returns
+        -------
+        dict[str, Any]
+            Snapshot with ``"state"``, ``"progress"``, ``"message"``,
+            ``"chunks_total"``, ``"chunks_done"``, and ``"active_chunks"``.
+        """
+        with self._lock:
+            current_status = (
+                None if self.current_status is None else dict(self.current_status)
+            )
+            return {
+                "state": (
+                    "COMPLETE"
+                    if is_done and not current_status
+                    else (
+                        current_status.get("state")
+                        if current_status is not None
+                        else "IDLE"
+                    )
+                ),
+                "progress": (
+                    current_status.get("progress")
+                    if current_status is not None
+                    else 0.0
+                ),
+                "message": (
+                    current_status.get("message")
+                    if current_status is not None
+                    else None
+                ),
+                "chunks_total": self.chunks_total,
+                "chunks_done": self.chunks_done,
+                "active_chunks": self.active_chunks,
+            }
 
 
 _ALLOWED_STATE_TYPES = (
@@ -734,18 +952,10 @@ class MerlinProcessor:
         layers: list[Any] = list(self._iter_layers_in_order(module))
 
         fut: Future = Future()
-        state = {
-            "cancel_requested": False,
-            "current_status": None,
-            "job_ids": [],
-            "chunks_total": 0,
-            "chunks_done": 0,
-            "active_chunks": 0,
-            "call_id": uuid.uuid4().hex[:8],
-        }
+        state = CallState.new()
 
         def _cancel_remote():
-            state["cancel_requested"] = True
+            state.request_cancel()
             self.cancel_all()
             if not fut.done():
                 try:
@@ -758,23 +968,11 @@ class MerlinProcessor:
                 fut.set_exception(CancelledError("Remote call was cancelled"))
 
         def _status():
-            js = state.get("current_status")
-            return {
-                "state": (
-                    "COMPLETE"
-                    if fut.done() and not js
-                    else (js.get("state") if js else "IDLE")
-                ),
-                "progress": js.get("progress") if js else 0.0,
-                "message": js.get("message") if js else None,
-                "chunks_total": state["chunks_total"],
-                "chunks_done": state["chunks_done"],
-                "active_chunks": state["active_chunks"],
-            }
+            return state.status_snapshot(is_done=fut.done())
 
         fut.cancel_remote = _cancel_remote  # type: ignore[attr-defined]
         fut.status = _status  # type: ignore[attr-defined]
-        fut.job_ids = state["job_ids"]  # type: ignore[attr-defined]
+        fut.job_ids = state.job_ids  # type: ignore[attr-defined]
 
         def _run_pipeline():
             try:
@@ -791,7 +989,7 @@ class MerlinProcessor:
                     else:
                         should_offload = False
 
-                    if state["cancel_requested"]:
+                    if state.is_cancel_requested():
                         raise self._cancelled_error()
 
                     if should_offload:
@@ -818,7 +1016,7 @@ class MerlinProcessor:
         layer: MerlinModule,
         input_tensor: torch.Tensor,
         nsample: int | None,
-        state: dict,
+        state: CallState,
         deadline: float | None,
     ) -> torch.Tensor:
         """Split the batch into chunks of size <= microbatch_size,
@@ -856,11 +1054,11 @@ class MerlinProcessor:
         input_tensor: torch.Tensor,
         chunks: list[tuple[int, int]],
         nsample: int | None,
-        state: dict,
+        state: CallState,
         deadline: float | None,
     ) -> torch.Tensor:
         """Submit chunk jobs with limited concurrency and stitch results."""
-        state["chunks_total"] += len(chunks)
+        state.add_chunks_total(len(chunks))
         outputs: list[torch.Tensor | None] = [None] * len(chunks)
         errors: list[BaseException] = []
 
@@ -870,7 +1068,7 @@ class MerlinProcessor:
         def _call(s: int, e: int, idx: int):
             try:
                 base_label = (
-                    f"mer:{layer_name}:{state['call_id']}:{idx + 1}/{total_chunks}"
+                    f"mer:{layer_name}:{state.call_id}:{idx + 1}/{total_chunks}"
                 )
                 t = self._run_chunk(
                     layer,
@@ -891,8 +1089,7 @@ class MerlinProcessor:
         while idx < len(chunks) or in_flight > 0:
             while idx < len(chunks) and in_flight < self.chunk_concurrency:
                 s, e = chunks[idx]
-                with self._lock:
-                    state["active_chunks"] += 1
+                state.mark_chunk_started()
                 th = threading.Thread(target=_call, args=(s, e, idx), daemon=True)
                 th.start()
                 futures.append(th)
@@ -903,9 +1100,7 @@ class MerlinProcessor:
                 if not th.is_alive():
                     futures.remove(th)
                     in_flight -= 1
-                    with self._lock:
-                        state["active_chunks"] = max(0, state["active_chunks"] - 1)
-                        state["chunks_done"] += 1
+                    state.mark_chunk_finished()
 
             if deadline is not None and time.time() >= deadline:
                 self.cancel_all()
@@ -924,7 +1119,7 @@ class MerlinProcessor:
         config: ValidatedLayerConfig,
         input_chunk: torch.Tensor,
         nsample: int | None,
-        state: dict,
+        state: CallState,
         deadline: float | None,
         job_base_label: str | None = None,
     ) -> torch.Tensor:
@@ -964,7 +1159,7 @@ class MerlinProcessor:
 
         last_error: BaseException | None = None
         for attempt in range(self._MAX_CHUNK_RETRIES):
-            if state.get("cancel_requested"):
+            if state.is_cancel_requested():
                 raise CancelledError("Remote call was cancelled")
             if deadline is not None and time.time() >= deadline:
                 raise TimeoutError("Remote call timed out (remote cancel issued)")
@@ -1123,7 +1318,7 @@ class MerlinProcessor:
     def _poll_job(
         self,
         job: RemoteJob,
-        state: dict,
+        state: CallState,
         deadline: float | None,
         batch_size: int,
         layer: MerlinModule,
@@ -1141,8 +1336,9 @@ class MerlinProcessor:
         ----------
         job : RemoteJob
             Submitted Perceval job to poll.
-        state : dict
-            Shared state dict tracking cancellation, chunks, job IDs, etc.
+        state : CallState
+            Shared per-call state tracking cancellation, chunks, job IDs, and
+            the latest remote status.
         deadline : float | None
             Absolute time (seconds) when execution should timeout.
         batch_size : int
@@ -1169,7 +1365,7 @@ class MerlinProcessor:
         non_dict_retries = 0
         sleep_ms = 50
         while True:
-            if state.get("cancel_requested"):
+            if state.is_cancel_requested():
                 cancel = getattr(job, "cancel", None)
                 if callable(cancel):
                     with suppress(Exception):
@@ -1184,18 +1380,17 @@ class MerlinProcessor:
                 raise TimeoutError("Remote call timed out (remote cancel issued)")
 
             s = getattr(job, "status", None)
-            state["current_status"] = {
-                "state": getattr(s, "state", None) if s else None,
-                "progress": getattr(s, "progress", None) if s else None,
-                "message": getattr(s, "stop_message", None) if s else None,
-            }
+            state.set_current_status(
+                state=getattr(s, "state", None) if s else None,
+                progress=getattr(s, "progress", None) if s else None,
+                message=getattr(s, "stop_message", None) if s else None,
+            )
 
             job_id = getattr(job, "id", None) or getattr(job, "job_id", None)
-            if job_id is not None and job_id not in state["job_ids"]:
-                state["job_ids"].append(job_id)
+            state.record_job_id(job_id)
 
             if getattr(job, "is_failed", False):
-                msg = state["current_status"].get("message")
+                msg = state.status_snapshot().get("message")
                 if msg and "Cancel requested" in str(msg):
                     with self._lock:
                         self._active_jobs.discard(job)

@@ -69,6 +69,81 @@ BackendCapabilities
       print(f"Platform: {caps.name}")
       print(f"Supports: {caps.available_commands}")
 
+CallState
+---------
+.. class:: CallState(cancel_requested=False, current_status=None, job_ids=None, chunks_total=0, chunks_done=0, active_chunks=0, call_id=None)
+
+   Mutable per-call state carrier used by :class:`MerlinProcessor` asynchronous
+   execution. It replaces the previous anonymous state dictionary with typed,
+   searchable fields and named mutation helpers.
+
+   **Attributes**
+
+   .. attribute:: cancel_requested
+
+      ``bool`` — Whether cooperative cancellation has been requested.
+
+   .. attribute:: current_status
+
+      ``dict[str, Any] | None`` — Latest remote status payload containing
+      ``"state"``, ``"progress"``, and ``"message"``.
+
+   .. attribute:: job_ids
+
+      ``list[str]`` — Remote job identifiers observed during this call.
+      Duplicate identifiers are ignored by :meth:`record_job_id`.
+
+   .. attribute:: chunks_total
+                  chunks_done
+                  active_chunks
+
+      ``int`` — Chunk scheduling and progress counters exposed by
+      :meth:`status_snapshot`.
+
+   .. attribute:: call_id
+
+      ``str`` — Short identifier used in generated remote job names.
+
+   .. classmethod:: new() -> CallState
+
+      Create a fresh state object with no cancellation, no observed jobs, and
+      zero chunk counters.
+
+   .. method:: request_cancel() -> None
+
+      Mark the call as cooperatively cancelled.
+
+   .. method:: is_cancel_requested() -> bool
+
+      Return whether cooperative cancellation has been requested.
+
+   .. method:: record_job_id(job_id) -> None
+
+      Record a remote job identifier once. ``None`` is ignored.
+
+   .. method:: set_current_status(*, state, progress, message) -> None
+
+      Store the latest remote status payload.
+
+   .. method:: add_chunks_total(count) -> None
+
+      Increase the scheduled chunk count.
+
+   .. method:: mark_chunk_started() -> None
+
+      Increment the active chunk count.
+
+   .. method:: mark_chunk_finished() -> None
+
+      Decrement the active chunk count without going below zero and increment
+      the completed chunk count.
+
+   .. method:: status_snapshot(*, is_done=False) -> dict
+
+      Return the user-facing async status payload with ``"state"``,
+      ``"progress"``, ``"message"``, ``"chunks_total"``, ``"chunks_done"``,
+      and ``"active_chunks"``.
+
 MerlinProcessor
 ---------------
 .. class:: MerlinProcessor(remote_processor=None, session=None, microbatch_size=32, timeout=3600.0, max_shots_per_call=None, chunk_concurrency=1)

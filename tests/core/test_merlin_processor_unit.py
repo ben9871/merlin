@@ -2415,3 +2415,60 @@ def test_offload_quantum_layer_with_chunking_validates_and_caches_export_config(
         None,
     )
     assert layer.export_config_calls == 1
+
+
+def test_merlin_module_instances_have_distinct_remote_cache_keys():
+    """Different Merlin layers must not share cached export configs."""
+    proc = make_processor(["probs", "sample_count"])
+
+    class ExportableLayer(MerlinModule):
+        def __init__(self, name: str, input_param_order: list[str]) -> None:
+            super().__init__()
+            self.name = name
+            self.input_param_order = input_param_order
+            self.export_config_calls = 0
+
+        def export_config(self):
+            self.export_config_calls += 1
+            return {
+                "circuit": pcvl.Circuit(m=2, name=self.name),
+                "input_state": [1, 0],
+                "input_param_order": self.input_param_order,
+            }
+
+    first_layer = ExportableLayer("first", ["first_0", "first_1"])
+    second_layer = ExportableLayer("second", ["second_0", "second_1"])
+    observed_param_orders: list[list[str]] = []
+
+    def fake_run_chunks_pooled(
+        layer_arg, config, input_tensor, chunks, nsample, state, deadline
+    ):
+        observed_param_orders.append(config.input_param_order)
+        return torch.ones(input_tensor.shape[0], 1)
+
+    proc._run_chunks_pooled = fake_run_chunks_pooled
+
+    assert first_layer.uid != second_layer.uid
+
+    proc._offload_quantum_layer_with_chunking(
+        first_layer,
+        torch.zeros(1, 2),
+        None,
+        {},
+        None,
+    )
+    proc._offload_quantum_layer_with_chunking(
+        second_layer,
+        torch.zeros(1, 2),
+        None,
+        {},
+        None,
+    )
+
+    assert observed_param_orders == [
+        ["first_0", "first_1"],
+        ["second_0", "second_1"],
+    ]
+    assert first_layer.export_config_calls == 1
+    assert second_layer.export_config_calls == 1
+    assert len(proc._layer_cache) == 2

@@ -27,7 +27,7 @@ Main QuantumLayer implementation
 from __future__ import annotations
 
 import warnings
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from contextlib import contextmanager
 from typing import Any, cast
 
@@ -63,6 +63,7 @@ from ..utils.deprecations import (
     normalize_measurement_strategy,
     sanitize_parameters,
 )
+from ..utils.dtypes import complex_dtype_for, float_dtype_for
 from ..utils.grouping import ModGrouping
 from ..utils.normalization import normalize_probabilities_and_amplitudes
 from .layer_utils import (
@@ -1495,6 +1496,95 @@ class QuantumLayer(MerlinModule):
         # Fatal deprecation is handled by the sanitize_parameters decorator via registry.
         return None
 
+    def _apply_to_memristive_tensors(
+        self, fn: Callable[[torch.Tensor], torch.Tensor]
+    ) -> None:
+        """Apply a tensor transform to memristive state and history.
+
+        Parameters
+        ----------
+        fn : Callable[[torch.Tensor], torch.Tensor]
+            Transform supplied by PyTorch device and dtype conversion paths.
+
+        Returns
+        -------
+        None
+            The memristive state and history are updated in place.
+        """
+        converted_by_id: dict[int, torch.Tensor] = {}
+
+        def convert(tensor: torch.Tensor) -> torch.Tensor:
+            tensor_id = id(tensor)
+            converted = converted_by_id.get(tensor_id)
+            if converted is None:
+                converted = fn(tensor)
+                converted_by_id[tensor_id] = converted
+            return converted
+
+        self.memristive_state = [
+            convert(state) for state in getattr(self, "memristive_state", [])
+        ]
+        self.memristive_history = [
+            [convert(state) for state in history]
+            for history in getattr(self, "memristive_history", [])
+        ]
+
+    def _first_runtime_tensor(self) -> torch.Tensor | None:
+        """Return a representative tensor for cached device and dtype fields.
+
+        Returns
+        -------
+        torch.Tensor | None
+            First available memristive state tensor, parameter, or buffer. If
+            the layer has no runtime tensors, returns ``None``.
+        """
+        for state in getattr(self, "memristive_state", []):
+            return state
+        for parameter in self.parameters(recurse=True):
+            return parameter
+        for buffer in self.buffers(recurse=True):
+            return buffer
+        return None
+
+    def _sync_device_dtype_from_runtime_tensors(self) -> None:
+        """Synchronize cached device and dtype fields after tensor conversion.
+
+        Returns
+        -------
+        None
+            ``device``, ``dtype``, and ``complex_dtype`` are updated when a
+            representative runtime tensor is available.
+        """
+        tensor = self._first_runtime_tensor()
+        if tensor is None:
+            return
+
+        if self.device is not None or tensor.device.type != "cpu":
+            self.device = tensor.device
+        try:
+            self.dtype = float_dtype_for(tensor.dtype)
+            self.complex_dtype = complex_dtype_for(tensor.dtype)
+        except TypeError:
+            pass
+
+    def _apply(self, fn: Callable[[torch.Tensor], torch.Tensor]) -> QuantumLayer:
+        """Apply PyTorch tensor conversions to all layer runtime tensors.
+
+        Parameters
+        ----------
+        fn : Callable[[torch.Tensor], torch.Tensor]
+            Transform used by :meth:`torch.nn.Module._apply`.
+
+        Returns
+        -------
+        QuantumLayer
+            The updated layer instance.
+        """
+        super()._apply(fn)
+        self._apply_to_memristive_tensors(fn)
+        self._sync_device_dtype_from_runtime_tensors()
+        return self
+
     def to(self, *args, **kwargs):
         """Move the layer and auxiliary transforms to a new device or dtype.
 
@@ -1580,17 +1670,7 @@ class QuantumLayer(MerlinModule):
         if self.device is not None:
             target_kwargs["device"] = self.device
 
-        # memristor state and history
-        for state in range(len(self.memristive_history)):
-            for t in range(len(self.memristive_history[state])):
-                self.memristive_history[state][t] = self.memristive_history[state][
-                    t
-                ].to(**target_kwargs)
-
-        for state in range(len(self.memristive_state)):
-            self.memristive_state[state] = self.memristive_state[state].to(
-                **target_kwargs
-            )
+        self._apply_to_memristive_tensors(lambda tensor: tensor.to(**target_kwargs))
 
         return self
 

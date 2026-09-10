@@ -1,6 +1,6 @@
 {
   "source": "OpenAlex",
-  "fetched_at": "2026-09-02",
+  "fetched_at": "2026-09-10",
   "papers": {
     "QCNN_data_classification": {
       "cited_by_count": 380,
@@ -15,12 +15,16 @@
       "openalex_id": "W4415084970"
     },
     "barren_plateaus": {
-      "cited_by_count": 2280,
+      "cited_by_count": 2295,
       "openalex_id": "W2794444783"
     },
     "bve_qnn": {
       "cited_by_count": 16,
       "openalex_id": "W4404465609"
+    },
+    "cv_qpinn": {
+      "cited_by_count": 1,
+      "openalex_id": "W6892106443"
     },
     "distributed_nn": {
       "cited_by_count": 0,
@@ -78,12 +82,16 @@
       "cited_by_count": 4,
       "openalex_id": "W4416874873"
     },
+    "qrc_level_generation": {
+      "cited_by_count": 0,
+      "openalex_id": "W4414687458"
+    },
     "qssl": {
-      "cited_by_count": 39,
+      "cited_by_count": 40,
       "openalex_id": "W3141189820"
     },
     "quantum_adversarial_ml": {
-      "cited_by_count": 141,
+      "cited_by_count": 142,
       "openalex_id": "W2998262898"
     },
     "quantum_reservoir_computing": {
@@ -91,7 +99,7 @@
       "openalex_id": "W4410252038"
     },
     "quantum_transfer_learning": {
-      "cited_by_count": 414,
+      "cited_by_count": 415,
       "openalex_id": "W2995742898"
     },
     "rf_rqks": {

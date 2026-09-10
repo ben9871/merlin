@@ -67,6 +67,7 @@ Computer Vision
    reproductions/photonic_qcnn
    reproductions/QCNN_data_classification
    reproductions/photonic_quantum_accelerated_ml
+   reproductions/quantum_vision_transformers
 
 .. merlin-gallery::
    :data: _data/galleries/reproduced_papers/reproduced_papers_computer_vision.json

@@ -251,5 +251,14 @@
     "venue": "IEEE Computer Graphics and Applications",
     "doi": "10.1109/MCG.2025.3591956",
     "doc": "reproduced_papers/reproductions/qrc_level_generation"
+  },
+  {
+    "key": "quantum_vision_transformers",
+    "title": "Quantum Vision Transformers",
+    "authors_short": "Cherrat et al.",
+    "year": 2024,
+    "venue": "Quantum",
+    "doi": "10.22331/q-2024-02-22-1265",
+    "doc": "reproduced_papers/reproductions/quantum_vision_transformers"
   }
 ]

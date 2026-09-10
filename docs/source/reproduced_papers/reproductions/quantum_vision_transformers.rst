@@ -19,7 +19,7 @@ Quantum Vision Transformers
 
    **Paper URL**: `arXiv:2209.08167 <https://arxiv.org/abs/2209.08167>`_
 
-   **Reproduction Status**: ✅ Complete — the paper's RetinaMNIST benchmark reproduces, with three architectural extensions added on top
+   **Reproduction Status**: ✅ Complete
 
    **Reproducer**: Benjamin Stott
 
@@ -34,38 +34,33 @@ Project Repository
 Abstract
 ========
 
-Cherrat et al. design transformer architectures whose attention mechanism is
-carried by a quantum circuit rather than by an explicit learned score matrix. The
-paper proposes a family of them — an orthogonal patch-wise network, a quantum
-orthogonal transformer computing pairwise overlap scores, a direct-attention
-variant, and a *compound* transformer in which attention emerges from
-two-photon interference plus a cross-partition read-out rather than being
-computed at all. The models are benchmarked on MedMNIST, with RetinaMNIST as the
-headline dataset, against a classical vision transformer and a quantum
-orthogonal fully-connected baseline.
-
-The claim under test is not raw accuracy but **accuracy at a much smaller
-attention-parameter budget**: the quantum attention layers are meant to match a
-classical ViT while parameterising attention with a fraction of the weights.
+The paper introduces transformer architectures in which the attention mechanism
+is carried by a quantum circuit rather than by an explicit learned score matrix.
+It proposes an orthogonal patch-wise network, a quantum orthogonal transformer
+computing pairwise overlap scores, a direct-attention variant, and a compound
+transformer in which attention arises from two-photon interference and a
+cross-partition read-out. The models are evaluated on MedMNIST, with RetinaMNIST
+as the headline dataset, against a classical vision transformer and a quantum
+orthogonal fully-connected baseline. The central claim concerns accuracy at a
+reduced attention-parameter budget rather than absolute accuracy.
 
 Significance
 ============
 
-Most quantum-attention proposals replace a classical block with a quantum one and
-report comparable accuracy, which on its own says little. What makes this paper
-worth reproducing is that its compound model makes a *structural* claim — that
-attention need not be materialised as a matrix at all, but can be read out of the
-interference pattern of a two-photon state. That is a claim about where the
-computation lives, and it is directly testable on a photonic simulator, because
-the sector structure the model relies on is native to linear optics.
+The compound model states that attention need not be materialised as a matrix,
+but can instead be read out of the interference pattern of a two-photon state.
+The sector structure this requires is native to linear optics, so the claim is
+directly testable on a photonic simulator. The reduced attention-parameter
+budget is measurable independently of accuracy, which makes the paper's principal
+claim falsifiable on a single benchmark.
 
 MerLin Implementation
 =====================
 
-The reproduction is built on MerLin's native linear-optics primitives —
+The reproduction uses MerLin's linear-optics primitives throughout:
 ``QuantumLayer``, ``CircuitBuilder``, and ``StateVector.from_tensor`` for
 amplitude-encoded inputs, with SLOS computing the compound actions internally.
-Six architectures share one wrapper:
+Six architectures share a single model wrapper.
 
 .. list-table:: Architectures
    :header-rows: 1
@@ -85,47 +80,101 @@ Six architectures share one wrapper:
      - Quantum orthogonal transformer
      - 1
      - d
-     - pairwise overlap scores through ``W``, softmax, features through ``V``
+     - overlap scores through ``W``, softmax, features through ``V``
    * - C
      - Direct quantum attention
      - 1
      - d
-     - same overlap scores as B, applied to inputs before the feature transform
+     - overlap scores as in B, applied before the feature transform
    * - D
      - Compound transformer
      - 2
      - n+d
-     - implicit; emerges from interference plus a cross-partition read-out
+     - implicit, from interference and a cross-partition read-out
    * - D_full
-     - Full-sector compound *(extension)*
+     - Full-sector compound (extension)
      - 2
      - n+d
-     - as D, but keeping every two-photon sector rather than cross-partition only
+     - as D, retaining every two-photon sector
    * - E
-     - Multi-sector attention *(extension)*
+     - Multi-sector attention (extension)
      - 1 + 2
      - n+d
-     - one shared interferometer: 1-photon sector gives features, 2-photon sector gives attention
+     - shared interferometer; 1-photon features, 2-photon attention
    * - F
-     - Hierarchical compound *(extension)*
+     - Hierarchical compound (extension)
      - 3
      - r+p+d
      - three-photon interference across region, patch and feature blocks
 
-Two circuit families are selectable. **generic** is a universal rectangular MZI
-mesh (Clements/Reck); **butterfly** is a structured mesh matching the layout used
-in the paper, and requires power-of-two mode counts. Post-selection is applied
-only where it is semantically required — the cross-partition read-out in D, and
-the triple-cross read-out in F.
+Two circuit families are selectable. The ``generic`` family is a universal
+rectangular MZI mesh. The ``butterfly`` family is a structured mesh matching the
+layout used in the paper and requires power-of-two mode counts. Post-selection is
+applied only where the read-out requires it: the cross-partition read-out in D
+and the triple-cross read-out in F.
+
+Key Contributions Reproduced
+============================
+
+**Paper benchmark on RetinaMNIST**
+  * Implemented models A, B, C and D together with the classical vision
+    transformer and the orthogonal fully-connected baseline.
+  * All reproduced AUC values fall within 0.012 of the paper's Table 4, and the
+    ordering of the models is preserved.
+
+**Attention-parameter budget**
+  * Measured attention-layer and total parameter counts for every model.
+  * Model A matches the classical vision transformer's AUC using an eighth of the
+    attention parameters, and model D using a third.
+
+**Breadth across MedMNIST**
+  * Evaluated four models on eight MedMNIST datasets at three seeds.
+  * The compound models attain the highest AUC on five of the eight datasets.
+
+**Circuit-family comparison**
+  * Compared the structured butterfly mesh against the universal generic mesh at
+    matched configuration.
+  * Accuracy differences fall inside the seed spread while simulation cost differs
+    by roughly an order of magnitude.
+
+**Architectural extensions**
+  * Added three architectures beyond the paper: a full-sector compound model, a
+    shared-interferometer multi-sector model, and a three-photon hierarchical
+    model.
+
+Implementation Details
+======================
+
+Runs are launched through the shared root CLI.
+
+.. code-block:: bash
+
+   python implementation.py --paper quantum_vision_transformers \
+       --config papers/quantum_vision_transformers/configs/paper/model_a_retina.json
+
+The paper directory provides suite wrappers for the full workflow.
+
+.. code-block:: bash
+
+   bash scripts/validation/validate.sh                                   # build and gradient checks
+   CPU_FRIENDLY=1 bash scripts/suites/run_retina_suite.sh --device cpu    # paper and butterfly workflow
+   CPU_FRIENDLY=1 bash scripts/suites/run_medmnist_suite.sh --device cpu  # MedMNIST workflow
+   python scripts/analysis/generate_figures.py outdir/                    # figures into results/figures/
+
+Each run directory stores the resolved configuration, a resumable checkpoint, the
+best validation-AUC weights, an incremental progress file and a final results
+file. Re-running with the same ``--outdir`` resumes from the checkpoint.
 
 Experimental Results
 ====================
 
-**RetinaMNIST against the paper's Table 4.** Reproduction figures are means over
-three seeds (7, 42, 123) in the butterfly family; the paper reports single
-values.
+RetinaMNIST against the paper
+-----------------------------
 
-.. list-table:: RetinaMNIST: paper Table 4 against this reproduction
+Reproduction values are means over three seeds (7, 42, 123) in the butterfly
+family. The paper reports single values.
+
+.. list-table:: RetinaMNIST: paper Table 4 against the reproduction
    :header-rows: 1
    :widths: 26 14 14 16 16
 
@@ -155,21 +204,15 @@ values.
      - 0.7409 ± 0.0106
      - 52.83%
    * - OrthoFNN baseline
-     - —
-     - —
+     - not reported
+     - not reported
      - 0.6720 ± 0.0083
      - 49.08%
 
-Every reproduced AUC lands within about 0.012 of the paper's reported value, and
-the ordering of the quantum models relative to the classical ViT is preserved.
-Accuracy comes out 2-5 points below the paper's across *all* models including the
-classical baseline, which points at a threshold or preprocessing difference
-affecting every arm equally rather than at any one architecture.
-
-The OrthoFNN baseline is the informative row: at 0.672 it sits far below
-everything else, so the benchmark does discriminate between architectures. The
-quantum attention models are not simply riding a task on which every model scores
-the same.
+Accuracy is 2 to 5 points below the paper for every model, including the
+classical baseline, while AUC agrees. The orthogonal fully-connected baseline
+reaches 0.672, well below the transformer models, so the benchmark separates
+architectures.
 
 .. figure:: ../../_static/reproduced_papers/quantum_vision_transformers/comparison_retinamnist.png
    :alt: Test AUC and accuracy per model on RetinaMNIST with the paper's reported values as dashed reference lines
@@ -177,13 +220,12 @@ the same.
    :width: 100%
 
    RetinaMNIST test AUC and accuracy, butterfly family, three seeds. Dashed lines
-   are the paper's reported values. The AUC panel tracks the reference closely;
-   the accuracy panel sits uniformly below it.
+   are the paper's reported values.
 
-**The parameter claim.** This is where the paper's argument actually rests, and it
-holds.
+Attention-parameter budget
+--------------------------
 
-.. list-table:: Attention parameters on RetinaMNIST
+.. list-table:: Parameter counts on RetinaMNIST
    :header-rows: 1
    :widths: 34 22 22 22
 
@@ -208,26 +250,27 @@ holds.
      - 7893
      - 0.7409 ± 0.0106
 
-Model A matches the classical ViT's AUC using **8x fewer attention parameters**,
-and D does so with 3.2x fewer while also carrying fewer total parameters. Note
-that the paper quotes attention parameters *per layer* (32, 64, 80) while the
-figures above are the measured totals for the whole model, so the two columns
-count different things; the ratio against the classical ViT is the comparable
-quantity, and it is the ratio the paper's claim is about.
+Model A matches the classical vision transformer's AUC with an eighth of the
+attention parameters, and model D with a third and a lower total parameter count.
+The paper reports attention parameters per layer (32, 64, 80) whereas the values
+above are measured totals, so only the ratio against the classical model is
+directly comparable.
 
 .. figure:: ../../_static/reproduced_papers/quantum_vision_transformers/param_comparison.png
    :alt: Attention-layer and total trainable parameters per model against the classical ViT attention reference
    :align: center
    :width: 100%
 
-   Attention-layer parameters (coloured) and total trainable parameters (grey)
-   per model. The dashed line is the classical ViT attention budget.
+   Attention-layer parameters and total trainable parameters per model. The
+   dashed line marks the classical attention budget.
 
-**Breadth across MedMNIST.** Eight datasets, three seeds, butterfly family, lite
-profile, trained on a capped 5000-sample training subset with the official
-validation and test splits intact.
+MedMNIST breadth
+----------------
 
-.. list-table:: Test AUC across MedMNIST (train_subset_5000 regime, 3 seeds)
+Eight datasets, three seeds, butterfly family, trained on a capped 5000-sample
+training subset with the official validation and test splits.
+
+.. list-table:: Test AUC across MedMNIST
    :header-rows: 1
    :widths: 28 18 18 18 18
 
@@ -277,76 +320,39 @@ validation and test splits intact.
      - 0.8167
      - 0.8209
 
-The compound models D and D_full lead on five of the eight datasets, and the
-spread between architectures is small relative to the spread between datasets.
-The extra sectors kept by D_full make little consistent difference over D, which
-is worth knowing: the cross-partition read-out the paper specifies appears to
-capture most of what the two-photon state carries for this task.
+The compound models lead on five of the eight datasets. Differences between
+architectures are small relative to differences between datasets. Retaining all
+two-photon sectors in D_full gives no consistent gain over the cross-partition
+read-out specified in the paper.
 
-**Circuit family.** The structured butterfly mesh matches the universal generic
-mesh on accuracy while being substantially cheaper to simulate. On RetinaMNIST,
-model A reaches AUC 0.7479 ± 0.0087 under butterfly against 0.7435 ± 0.0035 under
-generic, and model B 0.7369 ± 0.0064 against 0.7425 ± 0.0068 — differences inside
-the seed spread. Typical butterfly wall-clock for these runs is a few hundred
-seconds against a few thousand for generic. For power-of-two mode counts the
-structured family is the better default.
+Circuit family
+--------------
 
-Implementation Details
-======================
+On RetinaMNIST, model A reaches AUC 0.7479 ± 0.0087 under the butterfly family
+against 0.7435 ± 0.0035 under the generic family, and model B 0.7369 ± 0.0064
+against 0.7425 ± 0.0068. The differences are inside the seed spread. Typical
+butterfly wall-clock for these runs is a few hundred seconds against a few
+thousand for generic, so the structured family is preferable at power-of-two mode
+counts.
 
-Run through the shared root CLI:
+Limitations
+===========
 
-.. code-block:: bash
-
-   python implementation.py --paper quantum_vision_transformers \
-       --config papers/quantum_vision_transformers/configs/paper/model_a_retina.json
-
-From the paper directory, the suite wrappers cover the full workflow:
-
-.. code-block:: bash
-
-   bash scripts/validation/validate.sh                                   # all models build, gradients flow
-   CPU_FRIENDLY=1 bash scripts/suites/run_retina_suite.sh --device cpu    # paper + butterfly workflow
-   CPU_FRIENDLY=1 bash scripts/suites/run_medmnist_suite.sh --device cpu  # MedMNIST workflow
-   python scripts/analysis/generate_figures.py outdir/                    # figures -> results/figures/
-
-Each run directory holds the resolved config, a resumable ``last.pt`` checkpoint,
-``best.pt`` at best validation AUC, an incremental ``progress.json`` and a final
-``results.json``. Re-running with the same ``--outdir`` resumes automatically;
-``--resume never`` forces a fresh run.
-
-MerLin Version Note
-===================
-
-The reproduction runs against released ``merlinquantum>=0.4.0``. It previously
-depended on a vendored ``third_party/merlinquantum`` 0.3 branch; the sparse/EBS
-performance fixes and the amplitude-input ``StateVector`` path from that branch
-have since landed upstream, and the ``partition_blocks`` / ``allowed_counts``
-measurement filters that were removed are now applied classically in the read-out
-modules in ``lib/photonic_primitives.py``. There is no forked dependency.
-
-Deviations and Limitations
-==========================
-
-* **Accuracy runs uniformly below the paper's** by 2-5 points across every model
-  including the classical baseline, while AUC matches. The cause has not been
-  isolated; because it affects all arms equally it does not change the
-  between-model comparison, which is what the paper's claims concern.
-* **Extensions E and F are not trained to convergence.** The committed generic
-  full-profile rows for D_full, E and F stop at ``best_epoch = 1`` with wall-clock
-  in the tens of seconds, so their AUC figures there (0.65, 0.64, 0.64) are
-  single-epoch snapshots and must not be read as trained results. The
-  butterfly-family D_full runs *are* trained and are the ones reported above.
-* **Model C is only in the generic family** among the committed full-profile runs,
-  so it does not appear in the butterfly comparison table.
-* **The MedMNIST breadth is on a capped 5000-sample training subset**, not the
-  full training splits; validation and test splits are the official ones. It is a
-  data-efficiency comparison between architectures rather than a leaderboard
-  result.
-* Attention-parameter counts are totals here and per-layer in the paper, as noted
-  above.
-* The committed comparison figures have overlapping x-axis labels at this figure
-  size; the underlying values are in ``results/figures/*/summary.csv``.
+* Accuracy is 2 to 5 points below the paper for every model including the
+  classical baseline, while AUC agrees. The cause has not been isolated. Because
+  it affects all models equally it does not alter the between-model comparison.
+* The committed generic-family runs for D_full, E and F stop at the first epoch.
+  Their AUC values in that profile are single-epoch snapshots and are not trained
+  results. The butterfly-family D_full runs are trained.
+* Model C appears only in the generic family among the committed full-profile
+  runs and is therefore absent from the butterfly comparison.
+* The MedMNIST breadth uses a capped 5000-sample training subset with official
+  validation and test splits. It compares architectures under a fixed data budget
+  and is not a leaderboard result.
+* Attention-parameter counts are totals, whereas the paper reports per-layer
+  values.
+* The committed comparison figures have overlapping axis labels at this size. The
+  underlying values are in ``results/figures/*/summary.csv``.
 
 Code Access and Documentation
 =============================
@@ -371,7 +377,7 @@ Citation
 Related Reproductions
 =====================
 
-* :doc:`photonic_qcnn` — another photonic vision architecture on MedMNIST-style
-  data, useful as a contrast in how patches are encoded.
-* :doc:`nearest_centroids` — amplitude encoding with quantum inner-product
+* :doc:`photonic_qcnn` applies a photonic vision architecture to MedMNIST-style
+  data with a different patch-encoding scheme.
+* :doc:`nearest_centroids` uses amplitude encoding with quantum inner-product
   estimation, the primitive underlying the overlap scores in models B and C.

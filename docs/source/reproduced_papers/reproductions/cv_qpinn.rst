@@ -21,7 +21,7 @@ CV-QPINN: Quantum Physics-Informed Neural Networks for PDEs
 
    **Reproduction Status**: ⚠️ Partial
 
-   **Reproducer**: Benjamin Stott
+   **Reproducer**: Benjamin Stott (benjamin.stott@quandela.com)
 
 Project Repository
 ==================

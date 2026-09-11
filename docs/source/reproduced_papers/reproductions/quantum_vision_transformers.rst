@@ -21,7 +21,7 @@ Quantum Vision Transformers
 
    **Reproduction Status**: ✅ Complete
 
-   **Reproducer**: Benjamin Stott
+   **Reproducer**: Benjamin Stott (benjamin.stott@quandela.com)
 
 Project Repository
 ==================
